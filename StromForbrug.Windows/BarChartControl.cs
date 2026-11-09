@@ -90,7 +90,9 @@ public sealed class BarChartControl : Control
         var step = NiceStep(Math.Max(high - low, 1e-6) / 5);
         var yMax = Math.Max(step, Math.Ceiling(high * 1.04 / step) * step);
         var yMin = Math.Floor(low / step) * step;
-        var tickFormat = step >= 1 ? "0" : step >= 0.1 ? "0.0" : "0.00";
+        // As many decimals as the step needs (2.5 → "0.#"), never rounding a tick.
+        static bool IsWhole(double x) => Math.Abs(x - Math.Round(x)) < 1e-9;
+        var tickFormat = IsWhole(step) ? "0" : IsWhole(step * 10) ? "0.#" : "0.##";
         float Y(double v) => (float)(_plot.Top + (yMax - v) / (yMax - yMin) * _plot.Height);
 
         for (var v = yMin; v <= yMax + step / 1000; v += step)

@@ -144,7 +144,8 @@
         var step = NiceStep(Math.Max(high - low, 1e-6) / 5);
         _yMax = Math.Max(step, Math.Ceiling(high * 1.04 / step) * step);
         _yMin = Math.Floor(low / step) * step;
-        _tickFormat = step >= 1 ? "0" : step >= 0.1 ? "0.0" : "0.00";
+        // As many decimals as the step needs (2.5 → "0.#": 0 · 2,5 · 5 · 7,5), never rounding a tick.
+        _tickFormat = IsWhole(step) ? "0" : IsWhole(step * 10) ? "0.#" : "0.##";
 
         _ticks = [];
         for (var v = _yMin; v <= _yMax + step / 1000; v += step)
@@ -169,6 +170,8 @@
         var n = raw / magnitude;
         return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * magnitude;
     }
+
+    private static bool IsWhole(double v) => Math.Abs(v - Math.Round(v)) < 1e-9;
 
     private BarShape BuildBar(ChartBar bar)
     {
