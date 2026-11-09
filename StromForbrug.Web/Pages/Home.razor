@@ -476,6 +476,11 @@ else
         {
             _error = NotEloverblikText(ex);
         }
+        catch (EloverblikApiException ex) when (ex.IsTokenUnreadable)
+        {
+            _error = TokenUnreadableText;
+            _errorIsToken = true;
+        }
         catch (EloverblikApiException ex) when (ex.IsUnauthorized)
         {
             _error = "Eloverblik afviste tokenet. Det kan være udløbet eller slettet – opret et nyt på eloverblik.dk.";

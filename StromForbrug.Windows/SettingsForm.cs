@@ -173,13 +173,7 @@ public sealed class SettingsForm : Form
 
     // ---------------- values ----------------
 
-    internal static string? CleanToken(string text)
-    {
-        var token = text.Trim();
-        if (token.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
-            token = token[7..].Trim();
-        return token.Length == 0 ? null : token;
-    }
+    internal static string? CleanToken(string text) => RefreshTokenFormat.Clean(text);
 
     /// <summary>The digits of the combo's text, so both a picked item ("5713… – address") and a typed id work.</summary>
     private string? MeteringPointId
@@ -320,6 +314,10 @@ public sealed class SettingsForm : Form
             _lblStatus.Text = points.Count == 0
                 ? "Tokenet giver ikke adgang til nogen målepunkter."
                 : $"{points.Count} målepunkt(er) hentet.";
+        }
+        catch (EloverblikApiException ex) when (ex.IsTokenUnreadable)
+        {
+            _lblStatus.Text = "Eloverblik kunne ikke læse tokenet – det mangler sikkert et stykke. Kopiér det helt igen fra eloverblik.dk.";
         }
         catch (EloverblikApiException ex) when (ex.IsUnauthorized)
         {

@@ -35,6 +35,12 @@ public sealed class EloverblikApiException : Exception
     /// <summary>The refresh token was rejected: wrong, revoked or expired (they last at most a year).</summary>
     public bool IsUnauthorized => StatusCode == HttpStatusCode.Unauthorized;
 
+    /// <summary>
+    /// Eloverblik could not read the refresh token at all (500 at the token exchange): it is
+    /// almost always incomplete, e.g. a piece was lost when it was copied.
+    /// </summary>
+    public bool IsTokenUnreadable { get; init; }
+
     /// <summary>Eloverblik is throttling (429) or overloaded (503); trying again later usually works.</summary>
     public bool IsBusy => StatusCode is HttpStatusCode.TooManyRequests or HttpStatusCode.ServiceUnavailable or HttpStatusCode.GatewayTimeout;
 }
@@ -86,7 +92,7 @@ public sealed class EloverblikClient : IDisposable
         get => _refreshToken;
         set
         {
-            _refreshToken = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+            _refreshToken = RefreshTokenFormat.Clean(value);
             if (AccessToken is { } t && t.RefreshTokenKey != Fingerprint(_refreshToken))
                 AccessToken = null;
         }
@@ -274,11 +280,15 @@ public sealed class EloverblikClient : IDisposable
         var detail = response.StatusCode switch
         {
             HttpStatusCode.Unauthorized when tokenCall => "the refresh token was rejected (wrong, revoked or expired)",
+            HttpStatusCode.InternalServerError when tokenCall => "Eloverblik could not read the refresh token – it is probably incomplete",
             HttpStatusCode.TooManyRequests => "too many requests – Eloverblik limits how often data can be fetched",
             HttpStatusCode.ServiceUnavailable => "Eloverblik is busy – try again in a few minutes",
             _ => ExtractError(body)
         };
-        return new EloverblikApiException($"{(int)response.StatusCode} {response.ReasonPhrase}: {detail}", response.StatusCode);
+        return new EloverblikApiException($"{(int)response.StatusCode} {response.ReasonPhrase}: {detail}", response.StatusCode)
+        {
+            IsTokenUnreadable = tokenCall && response.StatusCode == HttpStatusCode.InternalServerError
+        };
     }
 
     private static string ExtractError(string body)

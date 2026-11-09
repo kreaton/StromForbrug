@@ -32,10 +32,24 @@
                        autocomplete="off" spellcheck="false" placeholder="Indsæt dit token fra eloverblik.dk" />
                 <button type="button" class="btn" @onclick="() => _showToken = !_showToken">@(_showToken ? "Skjul" : "Vis")</button>
             </div>
-            <small>
-                Log ind på <a href="https://eloverblik.dk" target="_blank" rel="noopener">eloverblik.dk</a> med MitID,
-                vælg <em>Datadeling</em> og <em>Opret token</em>. Et token gælder i op til et år.
-            </small>
+            @if (_setup.RefreshToken is { } token && !RefreshTokenFormat.LooksComplete(token))
+            {
+                <small class="error-text">
+                    Tokenet ser ufuldstændigt ud (@token.Length.ToString("N0") tegn – et helt token er ca. 3.500).
+                    Kopiér det igen fra eloverblik.dk, gerne med Markér alt, og indsæt det på ny.
+                </small>
+            }
+            else
+            {
+                <small>
+                    Log ind på <a href="https://eloverblik.dk" target="_blank" rel="noopener">eloverblik.dk</a> med MitID,
+                    vælg <em>Datadeling</em> og <em>Opret token</em>. Et token gælder i op til et år.
+                    @if (_setup.RefreshToken is { } t)
+                    {
+                        <span>(@t.Length.ToString("N0") tegn)</span>
+                    }
+                </small>
+            }
         </label>
 
         <label>
@@ -204,11 +218,8 @@
 
     private void OnTokenChanged(ChangeEventArgs e)
     {
-        // Pasted tokens often bring a stray line break or a "Bearer " prefix along.
-        var token = (e.Value as string)?.Trim();
-        if (token?.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) == true)
-            token = token[7..].Trim();
-        _setup.RefreshToken = string.IsNullOrEmpty(token) ? null : token;
+        // Pasted tokens often bring line breaks, spaces or a "Bearer " prefix along.
+        _setup.RefreshToken = RefreshTokenFormat.Clean(e.Value as string);
         _points = null;
         _pointsError = null;
     }
@@ -242,6 +253,10 @@
         catch (EloverblikApiException ex) when (ex.IsNotEloverblik)
         {
             _pointsError = NotEloverblikText(ex);
+        }
+        catch (EloverblikApiException ex) when (ex.IsTokenUnreadable)
+        {
+            _pointsError = TokenUnreadableText;
         }
         catch (EloverblikApiException ex) when (ex.IsUnauthorized)
         {
