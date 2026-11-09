@@ -1,0 +1,86 @@
+name: Build and Deploy StromForbrug to FTP and GitHub Pages
+
+on:
+  push:
+    branches: [ "main" ]
+    # Only the web app and what it is built from; changes to the WinForms app don't redeploy.
+    paths:
+      - "StromForbrug.Web/**"
+      - "StromForbrug.Core/**"
+      - "Eloverblik/**"
+      - "Stromligning/**"
+      - ".github/workflows/deploy-web.yml"
+  workflow_dispatch: # Also allows a manual run from the Actions tab
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x # The project targets net10.0
+
+      - name: Publish .NET App
+        # The run number becomes the patch version (1.0.<run>), see StromForbrug.Web.csproj
+        run: dotnet publish StromForbrug.Web/StromForbrug.Web.csproj -c Release -o release -p:BuildNumber=${{ github.run_number }}
+
+      - name: Upload publish artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: publish-output
+          path: release
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download publish artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: publish-output
+          path: release
+
+      # Uploads the static site (wwwroot/). Only changed files are sent after the first run.
+      # Repository secrets (Settings > Secrets and variables > Actions):
+      #   FTP_HOST      e.g. ftp.example.com
+      #   FTP_USERNAME
+      #   FTP_PASSWORD
+      #   FTP_FOLDER    e.g. webroots/www/stromforbrug  (no trailing slash)
+      - name: Deploy to FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          server-dir: ${{ secrets.FTP_FOLDER }}/
+          local-dir: ./release/wwwroot/
+
+  # Publishes to https://kreaton.github.io/StromForbrug/ (Settings > Pages > Source: GitHub Actions).
+  deploy-pages:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Download publish artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: publish-output
+          path: release
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: release/wwwroot
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

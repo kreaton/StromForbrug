@@ -1,0 +1,43 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject NavigationManager Nav
+
+<div class="shell">
+    <header class="topbar">
+        <a class="brand" href="">
+            <img src="icons/icon-192.png" width="28" height="28" alt="" />
+            StromForbrug
+        </a>
+        <nav>
+            @* Plain links: NavLink ignores the query string, so it can't tell the two views apart. *@
+            <a href="" class="@(InSetup ? null : "active")">Forbrug</a>
+            <a href="?vis=indstillinger" class="@(InSetup ? "active" : null)" title="Indstillinger">⚙ Indstillinger</a>
+        </nav>
+    </header>
+
+    <main>
+        @Body
+    </main>
+
+    <footer class="footer">
+        <span class="data-source">
+            <span>Data fra</span>
+            <a href="https://eloverblik.dk" target="_blank" rel="noopener">Eloverblik</a>
+            <span>og</span>
+            <a href="https://stromligning.dk" target="_blank" rel="noopener">
+                <img src="img/stromligning-logo.svg" alt="Strømligning" height="16" />
+            </a>
+        </span>
+        <span class="credits">Lavet med kærlighed 💛 (c) 2026 Per Hejndorf, Kreaton – @BuildInfo.Display</span>
+    </footer>
+</div>
+
+@code {
+    private bool InSetup => new Uri(Nav.Uri).Query.Contains("vis=", StringComparison.OrdinalIgnoreCase);
+
+    protected override void OnInitialized() => Nav.LocationChanged += OnLocationChanged;
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e) => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Nav.LocationChanged -= OnLocationChanged;
+}

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="da">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>StromForbrug</title>
+    <base href="./" />
+    <link rel="preload" id="webassembly" />
+    <meta name="description" content="Dit elforbrug time for time og dag for dag – i kWh og kroner" />
+    <meta name="theme-color" content="#1a8a57" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="167x167" href="icons/apple-touch-icon-167.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="icons/apple-touch-icon-152.png" />
+    <link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48" />
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="stylesheet" href="css/app.css" />
+    <script type="importmap"></script>
+</head>
+
+<body>
+    <div id="app">
+        <svg class="loading-progress">
+            <circle r="40%" cx="50%" cy="50%" />
+            <circle r="40%" cx="50%" cy="50%" />
+        </svg>
+        <div class="loading-progress-text"></div>
+    </div>
+
+    <div id="blazor-error-ui">
+        Der opstod en uventet fejl.
+        <a href="." class="reload">Genindlæs</a>
+        <span class="dismiss">🗙</span>
+    </div>
+    <script src="js/stromforbrug.js"></script>
+    <script src="_framework/blazor.webassembly#[.{fingerprint}].js" autostart="false"></script>
+    <script>
+        // If the app cannot start (typically an old cached page after an update, whose files no
+        // longer exist), say so instead of leaving the loading circle spinning forever.
+        function startFailed(e) {
+            console.error(e);
+            if (document.querySelector(".start-failed")) return;
+            document.getElementById("app").innerHTML =
+                '<div class="start-failed"><h1>StromForbrug kunne ikke starte</h1>' +
+                '<p>Siden er måske blevet opdateret. Genindlæs den – eventuelt med Ctrl+F5.</p>' +
+                '<a class="btn primary" href="." onclick="location.reload(true); return false;">Genindlæs</a></div>';
+        }
+        // Blazor reports "Failed to start platform" as an unhandled rejection, not via start().
+        window.addEventListener("unhandledrejection", function (ev) {
+            var msg = String(ev.reason && (ev.reason.message || ev.reason));
+            if (msg.indexOf("Failed to start platform") >= 0 || msg.indexOf("dynamically imported module") >= 0)
+                startFailed(ev.reason);
+        });
+        Blazor.start().catch(startFailed);
+    </script>
+</body>
+
+</html>

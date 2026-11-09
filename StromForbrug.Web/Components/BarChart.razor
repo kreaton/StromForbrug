@@ -1,0 +1,215 @@
+@using System.Globalization
+
+@* Stacked bars over time. Hourly bars have a fixed width and the plot scrolls sideways when they
+   do not fit, with the value axis staying put on the left; daily bars (at most a month) share
+   the width between them. Gridlines fall on round numbers picked from the data. *@
+
+<div class="legend" aria-label="Forklaring">
+    @if (Parts.Count > 1)
+    {
+        @foreach (var part in Parts)
+        {
+            <span class="legend-item"><span class="swatch @part.Css"></span>@part.Label</span>
+        }
+    }
+    @if (MutedLabel is not null && Bars.Any(b => b.Muted))
+    {
+        <span class="legend-item"><span class="swatch @Parts[0].Css muted"></span>@MutedLabel</span>
+    }
+    <span class="legend-unit">@Unit</span>
+</div>
+
+<div class="chart" style="--plot-top:@(Top)px; --plot-height:@(PlotHeight)px; --x-axis:@(XAxis)px;">
+    <div class="y-axis" aria-hidden="true">
+        @foreach (var v in _ticks)
+        {
+            <span class="tick" style="top:@Px(Y(v))">@v.ToString(_tickFormat)</span>
+        }
+    </div>
+
+    <div class="scroller" tabindex="0" aria-label="@AriaLabel" @onscroll="ClearHover">
+        <div class="plot @(Daily ? "daily" : null)" style="width:@PlotWidth" @onmouseleave="ClearHover">
+            @foreach (var v in _ticks)
+            {
+                <div class="grid @(v == 0 ? "zero" : null)" style="top:@Px(Y(v))"></div>
+            }
+
+            @foreach (var i in _separators)
+            {
+                <div class="day-line" style="left:@Left(i)"></div>
+            }
+
+            @for (var i = 0; i < Bars.Count; i++)
+            {
+                var bar = _bars[i];
+                var index = i;
+                <div class="bar @(Bars[i].Muted ? "muted" : null) @(index == _hover ? "hover" : null)"
+                     style="left:@Left(index); width:@BarWidth"
+                     @onmouseenter="e => Hover(index, e)"
+                     @onclick="e => Hover(index, e)">
+                    @foreach (var seg in bar.Segments)
+                    {
+                        <div class="seg @Parts[seg.Part].Css @(seg.IsTop ? "top" : null)"
+                             style="top:@Px(seg.Top); height:@Px(seg.Height)"></div>
+                    }
+                </div>
+            }
+
+            @if (_peak >= 0)
+            {
+                <div class="callout" style="left:@Center(_peak); top:@Px(_bars[_peak].TopY - 18)">▲ @Bars[_peak].Sum.ToString(ValueFormat)</div>
+            }
+        </div>
+
+        <div class="x-axis" style="width:@PlotWidth" aria-hidden="true">
+            @for (var i = 0; i < Bars.Count; i++)
+            {
+                var start = Bars[i].Start;
+                if (Daily)
+                {
+                    <span class="hour @(Bars.Count > 14 && start.DayOfWeek != DayOfWeek.Monday ? "minor" : null)"
+                          style="left:@Center(i)">@start.Day</span>
+                    if (i == 0 || start.Day == 1)
+                    {
+                        <span class="date" style="left:@Left(i)">@start.ToString("MMMM")</span>
+                    }
+                }
+                else
+                {
+                    if (start.Hour % 3 == 0)
+                    {
+                        <span class="hour" style="left:@Center(i)">@start.ToString("HH")</span>
+                    }
+                    if (i == 0 || (start.Hour == 0 && Bars[i - 1].Start.Date != start.Date))
+                    {
+                        <span class="date" style="left:calc(@Left(i) + 2px)">@start.ToString("ddd d. MMM")</span>
+                    }
+                }
+            }
+        </div>
+    </div>
+</div>
+
+@if (_hover >= 0 && _hover < Bars.Count && Tooltip is not null)
+{
+    <div class="tooltip" role="status"
+         style="left:min(@Px(_tipX + 16), calc(100vw - 280px)); top:max(8px, min(@Px(_tipY - 40), calc(100vh - 340px)));">
+        @Tooltip(_hover)
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<ChartBar> Bars { get; set; } = [];
+    [Parameter, EditorRequired] public IReadOnlyList<ChartPart> Parts { get; set; } = [];
+
+    /// <summary>Daily bars share the width; hourly ones get a fixed width and scroll.</summary>
+    [Parameter] public bool Daily { get; set; }
+
+    [Parameter] public string Unit { get; set; } = "";
+    [Parameter] public string ValueFormat { get; set; } = "0.00";
+    [Parameter] public string? MutedLabel { get; set; }
+    [Parameter] public string AriaLabel { get; set; } = "Diagram";
+    [Parameter] public RenderFragment<int>? Tooltip { get; set; }
+
+    private const double Step = 16;        // px per hour: 14px bar + 2px gap
+    private const double Top = 30;         // room above the plot for the callout
+    private const double PlotHeight = 280;
+    private const double XAxis = 44;
+
+    private sealed record Segment(int Part, double Top, double Height, bool IsTop);
+    private sealed record BarShape(List<Segment> Segments, double TopY);
+
+    private List<BarShape> _bars = [];
+    private List<double> _ticks = [];
+    private string _tickFormat = "0";
+    private List<int> _separators = [];
+    private int _peak = -1;
+    private double _yMin, _yMax;
+
+    private int _hover = -1;
+    private double _tipX, _tipY;
+
+    private string PlotWidth => Daily ? "100%" : Px(Bars.Count * Step);
+    private string BarWidth => Daily ? Pct(100.0 / Math.Max(1, Bars.Count)) : Px(Step);
+    private string Left(int i) => Daily ? Pct(i * 100.0 / Math.Max(1, Bars.Count)) : Px(i * Step);
+    private string Center(int i) => Daily ? Pct((i + 0.5) * 100.0 / Math.Max(1, Bars.Count)) : Px(i * Step + Step / 2);
+
+    protected override void OnParametersSet()
+    {
+        _hover = -1;
+
+        // Positive parts stack up from zero, negative ones (a negative spot price) down from it.
+        var high = Bars.Select(b => b.Values.Where(v => v > 0).Sum()).DefaultIfEmpty(0).Max();
+        var low = Bars.Select(b => b.Values.Where(v => v < 0).Sum()).DefaultIfEmpty(0).Min();
+        var step = NiceStep(Math.Max(high - low, 1e-6) / 5);
+        _yMax = Math.Max(step, Math.Ceiling(high * 1.04 / step) * step);
+        _yMin = Math.Floor(low / step) * step;
+        _tickFormat = step >= 1 ? "0" : step >= 0.1 ? "0.0" : "0.00";
+
+        _ticks = [];
+        for (var v = _yMin; v <= _yMax + step / 1000; v += step)
+            _ticks.Add(Math.Round(v, 6));
+
+        _bars = Bars.Select(BuildBar).ToList();
+
+        // Hourly: a line at each midnight. Daily: a line before each Monday, so weeks stand out.
+        _separators = Enumerable.Range(1, Math.Max(0, Bars.Count - 1))
+            .Where(i => Daily
+                ? Bars[i].Start.DayOfWeek == DayOfWeek.Monday
+                : Bars[i].Start.Date != Bars[i - 1].Start.Date)
+            .ToList();
+
+        _peak = Bars.Count > 1 ? Enumerable.Range(0, Bars.Count).MaxBy(i => Bars[i].Sum) : -1;
+    }
+
+    /// <summary>1, 2, 2.5 or 5 times a power of ten: gridlines on numbers people read easily.</summary>
+    private static double NiceStep(double raw)
+    {
+        var magnitude = Math.Pow(10, Math.Floor(Math.Log10(raw)));
+        var n = raw / magnitude;
+        return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * magnitude;
+    }
+
+    private BarShape BuildBar(ChartBar bar)
+    {
+        var segments = new List<Segment>();
+        double up = 0, down = 0;
+        var topIndex = -1;
+
+        for (var p = 0; p < bar.Values.Length && p < Parts.Count; p++)
+        {
+            var value = bar.Values[p];
+            if (value > 0)
+            {
+                segments.Add(new Segment(p, Y(up + value), Y(up) - Y(up + value), false));
+                up += value;
+                topIndex = segments.Count - 1;
+            }
+            else if (value < 0)
+            {
+                segments.Add(new Segment(p, Y(down), Y(down + value) - Y(down), false));
+                down += value;
+            }
+        }
+
+        if (topIndex >= 0)
+            segments[topIndex] = segments[topIndex] with { IsTop = true };
+
+        return new BarShape(segments, Y(up));
+    }
+
+    /// <summary>Value → px from the top of the plot.</summary>
+    private double Y(double value) => Top + (_yMax - value) / (_yMax - _yMin) * PlotHeight;
+
+    private static string Px(double value) => value.ToString("0.##", CultureInfo.InvariantCulture) + "px";
+    private static string Pct(double value) => value.ToString("0.####", CultureInfo.InvariantCulture) + "%";
+
+    private void Hover(int index, MouseEventArgs e)
+    {
+        _hover = index;
+        _tipX = e.ClientX;
+        _tipY = e.ClientY;
+    }
+
+    private void ClearHover() => _hover = -1;
+}

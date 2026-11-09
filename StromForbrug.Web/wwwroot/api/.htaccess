@@ -1,0 +1,9 @@
+# Apache often drops the Authorization header before PHP sees it; hand it on to eloverblik.php.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+</IfModule>
+# Never cache relayed answers (they carry access tokens and personal data).
+<IfModule mod_headers.c>
+    Header set Cache-Control "no-store"
+</IfModule>

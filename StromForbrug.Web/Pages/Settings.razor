@@ -1,0 +1,282 @@
+@using Eloverblik
+@inject CatalogService Catalog
+@inject SetupStore Store
+@inject EloverblikClient EloverblikApi
+@inject NavigationManager Nav
+
+@* Rendered by Home for "?vis=indstillinger": a page of its own that a plain static host can
+   reload, and where Home sends a first-time visitor. *@
+
+<PageTitle>Indstillinger · StromForbrug</PageTitle>
+
+<h1>Indstillinger</h1>
+@if (_firstRun)
+{
+    <div class="welcome">
+        <p><strong>Velkommen til StromForbrug.</strong> Se hvor meget strøm du har brugt – time for
+           time den seneste uge eller dag for dag den seneste måned – og hvad det har kostet med dit
+           netselskabs tariffer, afgifter og din elaftales tillæg.</p>
+        <p>Forbruget hentes fra Eloverblik med et token, du selv opretter. Priserne kommer fra stromligning.dk.</p>
+    </div>
+}
+<p class="lead">Indstillingerne gemmes kun i denne browser. Dit token sendes kun til Eloverblik.</p>
+
+<form class="setup" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+    <fieldset>
+        <legend>Eloverblik – dit forbrug</legend>
+
+        <label>
+            <span>Token</span>
+            <div class="inline">
+                <input type="@(_showToken ? "text" : "password")" value="@_setup.RefreshToken" @onchange="OnTokenChanged"
+                       autocomplete="off" spellcheck="false" placeholder="Indsæt dit token fra eloverblik.dk" />
+                <button type="button" class="btn" @onclick="() => _showToken = !_showToken">@(_showToken ? "Skjul" : "Vis")</button>
+            </div>
+            <small>
+                Log ind på <a href="https://eloverblik.dk" target="_blank" rel="noopener">eloverblik.dk</a> med MitID,
+                vælg <em>Datadeling</em> og <em>Opret token</em>. Et token gælder i op til et år.
+            </small>
+        </label>
+
+        <label>
+            <span>Målepunkt</span>
+            <div class="inline">
+                @if (_points is { Count: > 0 })
+                {
+                    <select value="@_setup.MeteringPointId" @onchange="OnPointChanged">
+                        <option value="">— vælg målepunkt —</option>
+                        @foreach (var p in _points)
+                        {
+                            <option value="@p.MeteringPointId">@p</option>
+                        }
+                    </select>
+                }
+                else
+                {
+                    <input type="text" inputmode="numeric" value="@_setup.MeteringPointId" @onchange="OnPointChanged"
+                           placeholder="18 cifre, fx 571313100000000000" spellcheck="false" />
+                }
+                <button type="button" class="btn" @onclick="LoadPointsAsync"
+                        disabled="@(_loadingPoints || string.IsNullOrWhiteSpace(_setup.RefreshToken))">
+                    @(_loadingPoints ? "Henter…" : "Hent målepunkter")
+                </button>
+            </div>
+            @if (_pointsError is not null)
+            {
+                <small class="error-text">@_pointsError</small>
+            }
+            else
+            {
+                <small>Målepunkts-id'et (18 cifre) står på elregningen – eller hent dine målepunkter med tokenet.</small>
+            }
+        </label>
+    </fieldset>
+
+    <fieldset>
+        <legend>Strømligning – priser i kroner</legend>
+
+        @if (_catalogError is not null)
+        {
+            <div class="notice error" role="alert">
+                Kunne ikke hente selskaberne: @_catalogError
+                <button type="button" class="btn" @onclick="LoadCatalogAsync">Prøv igen</button>
+            </div>
+        }
+        else if (_suppliers is null || _companies is null)
+        {
+            <p class="muted">Henter selskaber…</p>
+        }
+        else
+        {
+            <label>
+                <span>Netselskab</span>
+                <select value="@(_setup.SupplierId ?? "")" @onchange="OnSupplierChanged">
+                    <option value="">(intet – vis kun kWh)</option>
+                    @foreach (var s in _suppliers)
+                    {
+                        <option value="@s.Id">@s</option>
+                    }
+                </select>
+                <small>Bestemmer distributionstariffen og prisområdet (DK1/DK2). Uden netselskab vises ingen priser.</small>
+            </label>
+
+            <label>
+                <span>Kundegruppe</span>
+                <select @bind="_setup.CustomerGroupId" disabled="@(SelectedSupplier is null)">
+                    @foreach (var g in SelectedSupplier?.CustomerGroups ?? [])
+                    {
+                        <option value="@g.Id">@g</option>
+                    }
+                </select>
+            </label>
+
+            <label>
+                <span>Elhandelsselskab</span>
+                <select value="@(_setup.CompanyName ?? "")" @onchange="OnCompanyChanged" disabled="@(SelectedSupplier is null)">
+                    <option value="">(intet – kun spotpris uden tillæg)</option>
+                    @foreach (var c in _companies)
+                    {
+                        <option value="@c.Name">@c.Name</option>
+                    }
+                </select>
+                <small>Bestemmer tillægget. Fastprisprodukter er udeladt.</small>
+            </label>
+
+            <label>
+                <span>Produkt</span>
+                <select @bind="_setup.ProductId" disabled="@(SelectedCompany is null)">
+                    @foreach (var p in SelectedCompany?.SpotProducts ?? [])
+                    {
+                        <option value="@p.Id">@p.Name</option>
+                    }
+                </select>
+            </label>
+
+            <label class="check">
+                <input type="checkbox" @bind="_setup.IncludeVat" />
+                <span>Vis kroner inkl. moms</span>
+            </label>
+        }
+    </fieldset>
+
+    <div class="actions">
+        <button type="submit" class="btn primary" disabled="@(!_setup.IsComplete)">Gem og vis forbrug</button>
+        @if (!_firstRun)
+        {
+            <a class="btn" href="">Annuller</a>
+        }
+        @if (!_setup.IsComplete)
+        {
+            <span class="muted">Token og målepunkt skal udfyldes.</span>
+        }
+    </div>
+</form>
+
+@code {
+    private AppSetup _setup = new();
+
+    /// <summary>No saved settings yet: show the welcome, and there is nothing to cancel back to.</summary>
+    private bool _firstRun;
+    private IReadOnlyList<Supplier>? _suppliers;
+    private IReadOnlyList<Company>? _companies;
+    private string? _catalogError;
+
+    private List<MeteringPoint>? _points;
+    private string? _pointsError;
+    private bool _loadingPoints;
+    private bool _showToken;
+
+    private Supplier? SelectedSupplier => _suppliers?.FirstOrDefault(s => s.Id == _setup.SupplierId);
+    private Company? SelectedCompany => _companies?.FirstOrDefault(c => c.Name == _setup.CompanyName);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _setup = await Store.LoadAsync();
+        _firstRun = !_setup.IsComplete;
+        await LoadCatalogAsync();
+    }
+
+    private async Task LoadCatalogAsync()
+    {
+        _catalogError = null;
+        try
+        {
+            var suppliers = Catalog.GetSuppliersAsync();
+            var companies = Catalog.GetCompaniesAsync();
+            _suppliers = await suppliers;
+            _companies = await companies;
+
+            // Drop saved values that no longer exist, falling back to the defaults.
+            if (SelectedSupplier is null)
+                _setup.SupplierId = null;
+            if (SelectedSupplier?.CustomerGroups.All(g => g.Id != _setup.CustomerGroupId) ?? true)
+                _setup.CustomerGroupId = DefaultGroup(SelectedSupplier);
+            if (SelectedCompany is null)
+                _setup.CompanyName = null;
+            if (SelectedCompany?.SpotProducts.All(p => p.Id != _setup.ProductId) ?? true)
+                _setup.ProductId = SelectedCompany?.SpotProducts.FirstOrDefault()?.Id;
+        }
+        catch (Exception ex)
+        {
+            _catalogError = ex.Message;
+        }
+    }
+
+    private void OnTokenChanged(ChangeEventArgs e)
+    {
+        // Pasted tokens often bring a stray line break or a "Bearer " prefix along.
+        var token = (e.Value as string)?.Trim();
+        if (token?.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) == true)
+            token = token[7..].Trim();
+        _setup.RefreshToken = string.IsNullOrEmpty(token) ? null : token;
+        _points = null;
+        _pointsError = null;
+    }
+
+    private void OnPointChanged(ChangeEventArgs e)
+    {
+        var id = new string(((e.Value as string) ?? "").Where(char.IsDigit).ToArray());
+        _setup.MeteringPointId = id.Length == 0 ? null : id;
+    }
+
+    private async Task LoadPointsAsync()
+    {
+        _loadingPoints = true;
+        _pointsError = null;
+        try
+        {
+            EloverblikApi.RefreshToken = _setup.RefreshToken;
+            var points = await EloverblikApi.GetMeteringPointsAsync(CancellationToken.None);
+            // Consumption points first; production and child points are rarely what is wanted.
+            _points = points.OrderByDescending(p => p.IsConsumption).ThenBy(p => p.MeteringPointId).ToList();
+
+            if (_points.Count == 0)
+                _pointsError = "Tokenet giver ikke adgang til nogen målepunkter.";
+            else if (_points.All(p => p.MeteringPointId != _setup.MeteringPointId) && _points.Count(p => p.IsConsumption) == 1)
+                _setup.MeteringPointId = _points.First(p => p.IsConsumption).MeteringPointId;
+        }
+        catch (EloverblikApiException ex) when (ex.IsUnreadable)
+        {
+            _pointsError = UnreadableText(ex);
+        }
+        catch (EloverblikApiException ex) when (ex.IsNotEloverblik)
+        {
+            _pointsError = NotEloverblikText(ex);
+        }
+        catch (EloverblikApiException ex) when (ex.IsUnauthorized)
+        {
+            _pointsError = "Eloverblik afviste tokenet. Tjek at det er kopieret helt, og at det ikke er udløbet.";
+        }
+        catch (Exception ex)
+        {
+            _pointsError = "Kunne ikke hente målepunkter: " + ex.Message;
+        }
+        finally
+        {
+            _loadingPoints = false;
+        }
+    }
+
+    private void OnSupplierChanged(ChangeEventArgs e)
+    {
+        _setup.SupplierId = string.IsNullOrEmpty(e.Value as string) ? null : (string)e.Value!;
+        _setup.CustomerGroupId = DefaultGroup(SelectedSupplier);
+    }
+
+    private void OnCompanyChanged(ChangeEventArgs e)
+    {
+        _setup.CompanyName = string.IsNullOrEmpty(e.Value as string) ? null : (string)e.Value!;
+        _setup.ProductId = SelectedCompany?.SpotProducts.FirstOrDefault()?.Id;
+    }
+
+    private static string? DefaultGroup(Supplier? supplier) =>
+        supplier is null ? null : (supplier.CustomerGroups.FirstOrDefault(g => g.Default) ?? supplier.CustomerGroups.FirstOrDefault())?.Id;
+
+    private async Task SaveAsync()
+    {
+        if (!_setup.IsComplete)
+            return;
+        await Store.SaveAsync(_setup);
+        Nav.NavigateTo(Nav.BaseUri);
+    }
+}

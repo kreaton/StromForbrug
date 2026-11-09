@@ -1,0 +1,16 @@
+{
+  "name": "StromForbrug – dit elforbrug",
+  "short_name": "StromForbrug",
+  "description": "Dit elforbrug time for time og dag for dag, i kWh og kroner.",
+  "lang": "da",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0b4a30",
+  "theme_color": "#1a8a57",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

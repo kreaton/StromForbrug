@@ -1,0 +1,559 @@
+@page "/"
+@using System.Globalization
+@using Eloverblik
+@implements IDisposable
+@inject ConsumptionService Consumption
+@inject CatalogService Catalog
+@inject SetupStore Store
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+
+@if (ShowSettings)
+{
+    <Settings />
+    return;
+}
+
+<PageTitle>StromForbrug</PageTitle>
+
+@if (_setup is not { IsComplete: true })
+{
+    @* Without settings the page goes straight on to the settings (see OnParametersSetAsync). *@
+    <p class="muted">Indlæser…</p>
+}
+else
+{
+    <div class="page-head">
+        <div>
+            <h1>Elforbrug</h1>
+            <p class="muted">
+                Målepunkt @_setup.MeteringPointId
+                · @(_setup.HasPrices ? $"{_supplierName ?? _setup.SupplierId}{(_result?.PriceArea is { } a ? $" ({a})" : "")} · {_setup.CompanyName ?? "kun spotpris uden tillæg"}" : "uden priser")
+                · <a href="?vis=indstillinger">skift</a>
+            </p>
+        </div>
+        <div class="head-actions">
+            <button class="btn" @onclick="DownloadCsvAsync" disabled="@(_result is not { Hourly.Count: > 0 })">Hent CSV</button>
+            <button class="btn" @onclick="RefreshAsync" disabled="@_loading">@(_loading ? "Henter…" : "Opdater")</button>
+        </div>
+    </div>
+
+    <div class="toolbar">
+        <div class="segmented" role="group" aria-label="Visning">
+            <button class="@(Daily ? null : "active")" aria-pressed="@(!Daily)" @onclick="() => SetResolutionAsync(Resolution.Hour)">Time for time</button>
+            <button class="@(Daily ? "active" : null)" aria-pressed="@Daily" @onclick="() => SetResolutionAsync(Resolution.Day)">Dag for dag</button>
+        </div>
+        <label class="field">
+            <span>Fra</span>
+            <input type="date" value="@Iso(_from)" max="@Iso(DanishTime.Today)" @onchange="OnFromChangedAsync" />
+        </label>
+        <label class="field">
+            <span>Til</span>
+            <input type="date" value="@Iso(_to)" max="@Iso(DanishTime.Today)" @onchange="OnToChangedAsync" />
+        </label>
+        <div class="quick">
+            <button class="btn small" @onclick="() => QuickAsync(7)">Seneste 7 dage</button>
+            <button class="btn small" @onclick="() => QuickAsync(30)">Seneste 30 dage</button>
+        </div>
+    </div>
+
+    @if (_error is not null)
+    {
+        <div class="notice error" role="alert">
+            @_error
+            @if (_errorIsToken)
+            {
+                <a class="btn" href="?vis=indstillinger">Gå til indstillinger</a>
+            }
+        </div>
+    }
+
+    @if (_result is not null)
+    {
+        @if (_result.PriceError is { } pe)
+        {
+            <div class="notice warn" role="status">Priserne kunne ikke hentes (@pe.Message) – kun forbruget i kWh vises.</div>
+        }
+
+        @if (_result.Hourly.Count == 0)
+        {
+            <div class="notice warn" role="status">
+                Eloverblik har ingen målinger for @PeriodText. Data kommer normalt dagen efter, nogle gange
+                et par dage senere.
+            </div>
+        }
+        else
+        {
+            var rows = _result.Rows(_resolution);
+            var peak = rows.MaxBy(r => r.Kwh)!;
+
+            <div class="tiles">
+                <div class="tile">
+                    <span class="tile-label">Forbrug i alt</span>
+                    <span class="tile-value">@Kwh(_result.TotalKwh) kWh</span>
+                    <span class="tile-sub">@_result.Daily.Count @(_result.Daily.Count == 1 ? "dag" : "dage") · gns. @Kwh(_result.TotalKwh / Math.Max(1, _result.Hourly.Count) * 24) kWh/døgn</span>
+                </div>
+                <div class="tile">
+                    <span class="tile-label">Pris i alt</span>
+                    @if (_result.TotalCost is { } total)
+                    {
+                        <span class="tile-value">@Kr(Pick(total.Total)) kr</span>
+                        <span class="tile-sub">@VatText@(_result.HoursWithoutPrice > 0 ? $" · {_result.HoursWithoutPrice} timer uden pris" : "")</span>
+                    }
+                    else
+                    {
+                        <span class="tile-value">–</span>
+                        <span class="tile-sub">@(_setup.HasPrices ? "ingen priser" : "vælg netselskab i opsætningen")</span>
+                    }
+                </div>
+                <div class="tile">
+                    <span class="tile-label">Gennemsnitspris</span>
+                    @if (_result.AveragePrice is { } avg)
+                    {
+                        <span class="tile-value">@Pick(avg).ToString("0.00") kr/kWh</span>
+                        <span class="tile-sub">vægtet efter dit forbrug</span>
+                    }
+                    else
+                    {
+                        <span class="tile-value">–</span>
+                        <span class="tile-sub">&nbsp;</span>
+                    }
+                </div>
+                <div class="tile">
+                    <span class="tile-label">@(Daily ? "Højeste dag" : "Højeste time")</span>
+                    <span class="tile-value">@Kwh(peak.Kwh) kWh</span>
+                    <span class="tile-sub">@When(peak)</span>
+                </div>
+            </div>
+
+            <p class="muted small">
+                Data fra Eloverblik @DataUntilText(_result.DataUntil!.Value).
+                @if (_result.EstimatedHours > 0)
+                {
+                    @($" {_result.EstimatedHours} timer er estimerede; de vises lysere.")
+                }
+            </p>
+
+            <section class="card">
+                <h2>Forbrug @(Daily ? "pr. dag" : "pr. time")</h2>
+                <BarChart Bars="KwhBars(rows)" Parts="KwhParts" Daily="Daily" Unit="kWh" ValueFormat="0.00"
+                          MutedLabel="Estimeret" AriaLabel="Forbrug i kWh">
+                    <Tooltip Context="i">
+                        @{ var row = rows[i]; }
+                        <div class="tip-head"><strong>@Title(row)</strong><span>@Span(row)</span></div>
+                        <table>
+                            <tbody>
+                                <tr class="total"><td>Forbrug</td><td class="num">@row.Kwh.ToString("0.000") kWh</td></tr>
+                                @if (row.AveragePrice is { } p)
+                                {
+                                    <tr><td>Gns. pris</td><td class="num">@Pick(p).ToString("0.000") kr/kWh</td></tr>
+                                }
+                                @if (row.Cost is { } c)
+                                {
+                                    <tr><td>Pris</td><td class="num">@Kr(Pick(c.Total)) kr</td></tr>
+                                }
+                            </tbody>
+                        </table>
+                        @if (row.IsEstimated)
+                        {
+                            <div class="tip-note">@(Daily ? $"{row.EstimatedHours} af {row.Hours} timer er estimerede." : "Estimeret måling.")</div>
+                        }
+                    </Tooltip>
+                </BarChart>
+
+                <details class="table-view">
+                    <summary>Vis som tabel</summary>
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>@(Daily ? "Dag" : "Tid")</th>
+                                    <th class="num">kWh</th>
+                                    @if (Daily)
+                                    {
+                                        <th class="num">Højeste time</th>
+                                    }
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var row in rows)
+                                {
+                                    <tr class="@(row.IsEstimated ? "estimated" : null)">
+                                        <td>@RowLabel(row)@(row.IsEstimated ? " *" : "")</td>
+                                        <td class="num">@row.Kwh.ToString("0.000")</td>
+                                        @if (Daily)
+                                        {
+                                            var max = _result.Hourly.Where(h => h.Start.Date == row.Start.Date).MaxBy(h => h.Kwh)!;
+                                            <td class="num">@max.Start.ToString("HH':'mm") · @max.Kwh.ToString("0.000")</td>
+                                        }
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td>I alt</td>
+                                    <td class="num">@_result.TotalKwh.ToString("0.000")</td>
+                                    @if (Daily)
+                                    {
+                                        <td></td>
+                                    }
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    <p class="muted">* indeholder estimerede målinger.</p>
+                </details>
+            </section>
+
+            @if (_result.TotalCost is not null)
+            {
+                <section class="card">
+                    <h2>Pris @(Daily ? "pr. dag" : "pr. time")</h2>
+                    <BarChart Bars="CostBars(rows)" Parts="CostParts" Daily="Daily" Unit="@($"kr {VatText}")" ValueFormat="0.00"
+                              MutedLabel="Mangler pris" AriaLabel="Pris i kroner">
+                        <Tooltip Context="i">
+                            @{ var row = rows[i]; }
+                            <div class="tip-head"><strong>@Title(row)</strong><span>@Span(row)</span></div>
+                            @if (row.Cost is { } c)
+                            {
+                                <table>
+                                    <tbody>
+                                        @for (var p = Cost.Components.Length - 1; p >= 0; p--)
+                                        {
+                                            <tr>
+                                                <td><span class="swatch @CostParts[p].Css"></span>@Cost.Components[p].Label</td>
+                                                <td class="num">@Kr(Pick(Cost.Components[p].Get(c))) kr</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                    <tfoot>
+                                        <tr><td>I alt ekskl. moms</td><td class="num">@Kr(c.Total.ExVat) kr</td></tr>
+                                        <tr><td>Moms</td><td class="num">@Kr(c.Total.Vat) kr</td></tr>
+                                        <tr class="total"><td>I alt inkl. moms</td><td class="num">@Kr(c.Total.Total) kr</td></tr>
+                                    </tfoot>
+                                </table>
+                                <div class="tip-note">
+                                    @row.Kwh.ToString("0.000") kWh à @(row.AveragePrice is { } ap ? Pick(ap).ToString("0.000") : "–") kr/kWh.
+                                    Komponenterne er vist @VatText.
+                                    @if (row.HoursWithoutPrice > 0)
+                                    {
+                                        @($" {row.HoursWithoutPrice} timer mangler pris.")
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="tip-kind">Ingen pris for dette tidsrum.</div>
+                            }
+                        </Tooltip>
+                    </BarChart>
+
+                    <details class="table-view">
+                        <summary>Vis som tabel</summary>
+                        <div class="table-scroll">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>@(Daily ? "Dag" : "Tid")</th>
+                                        <th class="num">kWh</th>
+                                        <th class="num">kr/kWh</th>
+                                        @foreach (var part in Cost.Components)
+                                        {
+                                            <th class="num">@part.Label</th>
+                                        }
+                                        <th class="num">I alt kr</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var row in rows)
+                                    {
+                                        <tr class="@(row.HoursWithoutPrice > 0 ? "estimated" : null)">
+                                            <td>@RowLabel(row)@(row.HoursWithoutPrice > 0 ? " *" : "")</td>
+                                            <td class="num">@row.Kwh.ToString("0.000")</td>
+                                            <td class="num">@(row.AveragePrice is { } ap ? Pick(ap).ToString("0.000") : "–")</td>
+                                            @foreach (var part in Cost.Components)
+                                            {
+                                                <td class="num">@(row.Cost is { } c ? Kr(Pick(part.Get(c))) : "–")</td>
+                                            }
+                                            <td class="num"><strong>@(row.Cost is { } t ? Kr(Pick(t.Total)) : "–")</strong></td>
+                                        </tr>
+                                    }
+                                </tbody>
+                                <tfoot>
+                                    @{ var sum = _result.TotalCost!.Value; }
+                                    <tr>
+                                        <td>I alt</td>
+                                        <td class="num">@_result.TotalKwh.ToString("0.000")</td>
+                                        <td class="num">@(_result.AveragePrice is { } avgAll ? Pick(avgAll).ToString("0.000") : "–")</td>
+                                        @foreach (var part in Cost.Components)
+                                        {
+                                            <td class="num">@Kr(Pick(part.Get(sum)))</td>
+                                        }
+                                        <td class="num"><strong>@Kr(Pick(sum.Total))</strong></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                        <p class="muted">Kroner @VatText. * mangler pris for en del af tidsrummet.</p>
+                    </details>
+                </section>
+
+                <p class="muted small">
+                    Prisen er beregnet time for time: forbruget i hver time gange timens pris fra
+                    stromligning.dk (gennemsnit af kvarterspriserne), med netselskabets tariffer,
+                    elafgift og elaftalens tillæg. Abonnementer og andre faste gebyrer er ikke med.
+                </p>
+            }
+        }
+    }
+    else if (_loading)
+    {
+        <p class="muted">Henter forbrug fra Eloverblik… det kan tage lidt tid.</p>
+    }
+}
+
+@code {
+    // The settings live behind "?vis=indstillinger" rather than on a route of their own,
+    // so a reload works on a plain static (FTP) host with no fallback to index.html.
+    [SupplyParameterFromQuery(Name = "vis")] public string? View { get; set; }
+
+    private bool ShowSettings => View is { } v && (v.Equals("indstillinger", StringComparison.OrdinalIgnoreCase) || v.Equals("opsaetning", StringComparison.OrdinalIgnoreCase));
+
+    private static readonly CultureInfo Da = CultureInfo.GetCultureInfo("da-DK");
+
+    private static readonly ChartPart[] KwhParts = [new("Forbrug", "kwh")];
+
+    private static readonly ChartPart[] CostParts =
+        Cost.Components.Select((c, i) => new ChartPart(c.Label, $"s{i + 1}")).ToArray();
+
+    private AppSetup? _setup;
+    private string? _loadedFor;
+    private Resolution _resolution = Resolution.Hour;
+    private DateOnly _from, _to;
+
+    /// <summary>The last fetch, which may cover more days than shown (see LoadAsync).</summary>
+    private ConsumptionResult? _fetched;
+    private ConsumptionResult? _result;
+
+    private string? _supplierName;
+    private string? _error;
+    private bool _errorIsToken;
+    private bool _loading;
+    private CancellationTokenSource? _cts;
+
+    private bool Daily => _resolution == Resolution.Day;
+    private string VatText => _setup?.IncludeVat == false ? "ekskl. moms" : "inkl. moms";
+    private string PeriodText => _from == _to ? _from.ToString("d. MMMM") : $"{_from:d. MMMM} – {_to:d. MMMM}";
+
+    // Runs again when coming back from the setup, so changed settings are fetched.
+    protected override async Task OnParametersSetAsync()
+    {
+        if (ShowSettings)
+            return;
+
+        _setup = await Store.LoadAsync();
+        if (!_setup.IsComplete)
+        {
+            // First visit (or the settings were cleared): open the settings page by itself.
+            // Replace, so Back does not return to an empty page that redirects again.
+            Nav.NavigateTo("?vis=indstillinger", replace: true);
+            return;
+        }
+
+        var key = $"{_setup.MeteringPointId}|{_setup.RefreshToken}|{_setup.SupplierId}|{_setup.CustomerGroupId}|{_setup.ProductId}";
+        if (key == _loadedFor)
+            return;
+
+        _loadedFor = key;
+        _fetched = null;
+        _result = null;
+        _resolution = _setup.Resolution;
+        SetDefaultRange();
+        await LoadAsync();
+        _ = LoadSupplierNameAsync();
+    }
+
+    /// <summary>The past week hour by hour, or the past 30 days day by day, ending yesterday.</summary>
+    private void SetDefaultRange()
+    {
+        _to = DanishTime.Today.AddDays(-1);
+        _from = _to.AddDays(Daily ? -29 : -6);
+    }
+
+    private async Task SetResolutionAsync(Resolution resolution)
+    {
+        if (resolution == _resolution || _setup is null)
+            return;
+
+        _resolution = resolution;
+        SetDefaultRange();
+        _setup.Resolution = resolution;
+        await Store.SaveAsync(_setup);
+        await LoadAsync();
+    }
+
+    private Task QuickAsync(int days)
+    {
+        _to = DanishTime.Today.AddDays(-1);
+        _from = _to.AddDays(-(days - 1));
+        return LoadAsync();
+    }
+
+    private Task OnFromChangedAsync(ChangeEventArgs e)
+    {
+        if (!TryParseDay(e.Value, out var day))
+            return Task.CompletedTask;
+
+        _from = Min(day, DanishTime.Today);
+        if (_to < _from)
+            _to = _from;
+        if (_to.DayNumber - _from.DayNumber >= ConsumptionService.MaxDays)
+            _to = Min(_from.AddDays(ConsumptionService.MaxDays - 1), DanishTime.Today);
+        return LoadAsync();
+    }
+
+    private Task OnToChangedAsync(ChangeEventArgs e)
+    {
+        if (!TryParseDay(e.Value, out var day))
+            return Task.CompletedTask;
+
+        _to = Min(day, DanishTime.Today);
+        if (_from > _to)
+            _from = _to;
+        if (_to.DayNumber - _from.DayNumber >= ConsumptionService.MaxDays)
+            _from = _to.AddDays(-(ConsumptionService.MaxDays - 1));
+        return LoadAsync();
+    }
+
+    private Task RefreshAsync()
+    {
+        _fetched = null;
+        return LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        if (_setup is not { IsComplete: true })
+            return;
+
+        var query = new ConsumptionQuery(_setup.MeteringPointId!, _from, _to, _setup.PriceQuery);
+
+        // Switching view or narrowing the period reuses what was fetched.
+        if (_fetched?.Covers(query) == true)
+        {
+            _result = _fetched.Slice(_from, _to);
+            _error = null;
+            return;
+        }
+
+        _cts?.Cancel();
+        _cts = new CancellationTokenSource();
+        var ct = _cts.Token;
+        _loading = true;
+        _error = null;
+        _errorIsToken = false;
+
+        try
+        {
+            // Always fetch a whole month ending at "Til": hourly data for a month is small, and
+            // switching between the week and the month view is then instant.
+            var fetch = query with { From = Min(_from, _to.AddDays(-(ConsumptionService.MaxDays - 1))) };
+            var result = await Consumption.GetAsync(fetch, ct);
+            if (ct.IsCancellationRequested)
+                return;
+            _fetched = result;
+            _result = result.Slice(_from, _to);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (EloverblikApiException ex) when (ex.IsUnreadable)
+        {
+            _error = UnreadableText(ex);
+        }
+        catch (EloverblikApiException ex) when (ex.IsNotEloverblik)
+        {
+            _error = NotEloverblikText(ex);
+        }
+        catch (EloverblikApiException ex) when (ex.IsUnauthorized)
+        {
+            _error = "Eloverblik afviste tokenet. Det kan være udløbet eller slettet – opret et nyt på eloverblik.dk.";
+            _errorIsToken = true;
+        }
+        catch (EloverblikApiException ex) when (ex.IsBusy)
+        {
+            _error = "Eloverblik har travlt eller begrænser antallet af opslag lige nu. Prøv igen om et par minutter.";
+        }
+        catch (Exception ex)
+        {
+            _error = "Kunne ikke hente forbruget: " + ex.Message;
+            _errorIsToken = ex is EloverblikApiException;
+        }
+        finally
+        {
+            if (!ct.IsCancellationRequested)
+                _loading = false;
+        }
+    }
+
+    private async Task LoadSupplierNameAsync()
+    {
+        if (_setup?.HasPrices != true)
+            return;
+        try
+        {
+            _supplierName = (await Catalog.GetSuppliersAsync()).FirstOrDefault(s => s.Id == _setup.SupplierId)?.Name;
+            StateHasChanged();
+        }
+        catch
+        {
+            // The name is only cosmetic; the id is shown instead.
+        }
+    }
+
+    private async Task DownloadCsvAsync()
+    {
+        if (_result is null)
+            return;
+        var csv = ConsumptionExporter.ToCsv(_result.Rows(_resolution), Da);
+        var name = $"stromforbrug-{Iso(_from)}-{Iso(_to)}-{(Daily ? "dag" : "time")}.csv";
+        await JS.InvokeVoidAsync("stromForbrug.download", name, csv);
+    }
+
+    private IReadOnlyList<ChartBar> KwhBars(IReadOnlyList<ConsumptionRow> rows) =>
+        rows.Select(r => new ChartBar(r.Start, [r.Kwh], r.MostlyEstimated)).ToList();
+
+    private IReadOnlyList<ChartBar> CostBars(IReadOnlyList<ConsumptionRow> rows) =>
+        rows.Select(r => new ChartBar(r.Start,
+            r.Cost is { } c ? Cost.Components.Select(p => Pick(p.Get(c))).ToArray() : new double[Cost.Components.Length],
+            r.HoursWithoutPrice > 0)).ToList();
+
+    private double Pick(Money m) => _setup?.IncludeVat == false ? m.ExVat : m.Total;
+
+    private static string Kwh(double value) => value.ToString(value >= 100 ? "N0" : "N1");
+    private static string Kr(double value) => value.ToString("N2");
+    private static string Iso(DateOnly d) => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    private static DateOnly Min(DateOnly a, DateOnly b) => a < b ? a : b;
+
+    private static bool TryParseDay(object? value, out DateOnly day) =>
+        DateOnly.TryParseExact(value as string, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out day);
+
+    private string When(ConsumptionRow row) =>
+        Daily ? row.Start.ToString("dddd d. MMMM") : row.Start.ToString("ddd d. MMM 'kl.' HH':'mm");
+
+    private string RowLabel(ConsumptionRow row) =>
+        Daily ? row.Start.ToString("ddd d/M") : row.Start.ToString("ddd d/M HH':'mm");
+
+    private string Title(ConsumptionRow row) => row.Start.ToString("dddd d. MMMM");
+
+    private static string DataUntilText(DateTime end) =>
+        end.TimeOfDay == TimeSpan.Zero
+            ? "til og med " + end.AddDays(-1).ToString("dddd d. MMMM")
+            : "til " + end.ToString("dddd d. MMMM 'kl.' HH':'mm");
+
+    private string Span(ConsumptionRow row) =>
+        Daily ? $"{row.Hours} timer" : $"{row.Start:HH':'mm}–{row.End:HH':'mm}";
+
+    public void Dispose() => _cts?.Cancel();
+}
