@@ -46,7 +46,8 @@
                     vælg <em>Datadeling</em> og <em>Opret token</em>. Et token gælder i op til et år.
                     @if (_setup.RefreshToken is { } t)
                     {
-                        <span>(@t.Length.ToString("N0") tegn)</span>
+                        @* The checksum lets the same token be compared across devices without showing it. *@
+                        <span>(@t.Length.ToString("N0") tegn · kontrolsum @EloverblikClient.Fingerprint(t)[..8])</span>
                     }
                 </small>
             }
