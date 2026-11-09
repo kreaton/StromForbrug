@@ -35,8 +35,8 @@
             @if (_setup.RefreshToken is { } token && !RefreshTokenFormat.LooksComplete(token))
             {
                 <small class="error-text">
-                    Tokenet ser ufuldstændigt ud (@token.Length.ToString("N0") tegn – et helt token er ca. 3.500).
-                    Kopiér det igen fra eloverblik.dk, gerne med Markér alt, og indsæt det på ny.
+                    Tokenet ser ud til at mangle et stykke (@token.Length.ToString("N0") tegn). Kopiér det helt igen
+                    fra eloverblik.dk og indsæt det på ny – eller prøv Hent målepunkter alligevel.
                 </small>
             }
             else

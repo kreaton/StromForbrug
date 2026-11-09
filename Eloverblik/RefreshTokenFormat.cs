@@ -10,7 +10,11 @@ namespace Eloverblik;
 /// </summary>
 public static class RefreshTokenFormat
 {
-    /// <summary>Removes a "Bearer " prefix and every space and line break (a JWT never contains any).</summary>
+    /// <summary>
+    /// Removes a "Bearer " prefix and every character a token cannot contain: spaces, line breaks
+    /// and the invisible characters (zero-width spaces, soft hyphens...) that copying on a phone or
+    /// tablet can slip in. What is left is the base64url alphabet and the dots between the parts.
+    /// </summary>
     public static string? Clean(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))
@@ -18,20 +22,25 @@ public static class RefreshTokenFormat
         var token = text.Trim();
         if (token.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
             token = token[7..];
-        token = new string(token.Where(c => !char.IsWhiteSpace(c)).ToArray());
+        token = new string(token.Where(IsTokenChar).ToArray());
         return token.Length == 0 ? null : token;
     }
 
+    private static bool IsTokenChar(char c) =>
+        c is (>= 'A' and <= 'Z') or (>= 'a' and <= 'z') or (>= '0' and <= '9') or '-' or '_' or '.' or '+' or '/' or '=';
+
     /// <summary>
-    /// True when the token has a JWT's shape: three dot-separated parts, of which the first two
-    /// are base64url-encoded JSON objects. A token cut short anywhere almost always fails this.
+    /// False when the token is clearly cut short: a JWT has three dot-separated parts, and its
+    /// first part is a small base64url-encoded JSON header. Most of the token is the middle part,
+    /// so a token cut anywhere there loses the last dot and fails this. Deliberately lenient:
+    /// anything else is left to Eloverblik to judge.
     /// </summary>
     public static bool LooksComplete(string? token)
     {
         if (string.IsNullOrEmpty(token))
             return false;
         var parts = token.Split('.');
-        return parts.Length == 3 && parts[2].Length > 0 && IsJsonObject(parts[0]) && IsJsonObject(parts[1]);
+        return parts.Length == 3 && parts.All(p => p.Length > 0) && IsJsonObject(parts[0]);
     }
 
     private static bool IsJsonObject(string base64Url)
