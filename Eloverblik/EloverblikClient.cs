@@ -58,6 +58,7 @@ public sealed class EloverblikClient : IDisposable
     private readonly HttpClient _http;
     private readonly bool _ownsHttp;
     private readonly string _baseUrl;
+    private readonly bool _viaRelay;
     private readonly ProductInfoHeaderValue _userAgent;
     private readonly SemaphoreSlim _tokenLock = new(1, 1);
     private string? _refreshToken;
@@ -72,6 +73,7 @@ public sealed class EloverblikClient : IDisposable
     public EloverblikClient(HttpClient? http = null, string userAgent = DefaultUserAgent, string? baseUrl = null)
     {
         _baseUrl = (string.IsNullOrWhiteSpace(baseUrl) ? DefaultBaseUrl : baseUrl).TrimEnd('/');
+        _viaRelay = !string.Equals(_baseUrl, DefaultBaseUrl, StringComparison.OrdinalIgnoreCase);
         _ownsHttp = http is null;
         // Eloverblik can be slow, especially for longer periods.
         _http = http ?? new HttpClient { Timeout = TimeSpan.FromSeconds(90) };
@@ -160,7 +162,7 @@ public sealed class EloverblikClient : IDisposable
             var token = await GetAccessTokenAsync(forceNew: attempt > 0, ct).ConfigureAwait(false);
 
             using var request = createRequest();
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            Authorize(request, token);
             request.Headers.UserAgent.Add(_userAgent);
             request.Headers.Accept.ParseAdd("application/json");
 
@@ -175,6 +177,20 @@ public sealed class EloverblikClient : IDisposable
 
             return body;
         }
+    }
+
+    /// <summary>Header that repeats the bearer token for a relay (see <see cref="Authorize"/>).</summary>
+    public const string RelayAuthorizationHeader = "X-Eloverblik-Authorization";
+
+    /// <summary>
+    /// Sets the bearer token. Through a relay it is repeated in <see cref="RelayAuthorizationHeader"/>,
+    /// because many Apache/PHP hosts drop the Authorization header before the script sees it.
+    /// </summary>
+    private void Authorize(HttpRequestMessage request, string token)
+    {
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        if (_viaRelay)
+            request.Headers.TryAddWithoutValidation(RelayAuthorizationHeader, "Bearer " + token);
     }
 
     /// <summary>
@@ -209,7 +225,7 @@ public sealed class EloverblikClient : IDisposable
                 return AccessToken!.Value;
 
             using var request = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/token");
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _refreshToken);
+            Authorize(request, _refreshToken);
             request.Headers.UserAgent.Add(_userAgent);
             request.Headers.Accept.ParseAdd("application/json");
 

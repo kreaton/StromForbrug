@@ -38,7 +38,7 @@ if (preg_match('#^https?://(localhost|127\.0\.0\.1)(:\d+)?$#', $origin)) {
     header('Vary: Origin');
     if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
         header('Access-Control-Allow-Methods: GET, POST');
-        header('Access-Control-Allow-Headers: Authorization, Content-Type, Accept');
+        header('Access-Control-Allow-Headers: Authorization, X-Eloverblik-Authorization, Content-Type, Accept');
         header('Access-Control-Max-Age: 600');
         http_response_code(204);
         exit;
@@ -58,8 +58,10 @@ foreach (ROUTES as $pattern => $allowed) {
 if ($route === null) fail(404, 'Unknown Eloverblik path.');
 if ($method !== $route) fail(405, "Use $route for this path.");
 
-// Apache and PHP-FPM do not always pass Authorization on to PHP; look in every usual place.
-$auth = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+// Apache and PHP-FPM do not always pass Authorization on to PHP (hejndorf.dk does not), so the
+// app repeats the token in X-Eloverblik-Authorization, which always gets through.
+$auth = $_SERVER['HTTP_X_ELOVERBLIK_AUTHORIZATION'] ?? $_SERVER['HTTP_AUTHORIZATION']
+    ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
 if ($auth === '' && function_exists('getallheaders')) {
     $auth = array_change_key_case(getallheaders())['authorization'] ?? '';
 }
