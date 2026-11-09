@@ -2,6 +2,8 @@ using System.Globalization;
 using System.Text;
 using Eloverblik;
 using Stromligning;
+using Velopack;
+using Velopack.Sources;
 
 namespace StromForbrug.Windows;
 
@@ -36,6 +38,9 @@ public sealed class MainForm : Form
         ForeColor = Color.FromArgb(82, 81, 78)
     };
     private readonly Button _btnSettings = new() { Text = "⚙ Indstillinger...", Width = 140, Height = 30, Dock = DockStyle.Right };
+    private readonly Button _btnUpdate = new() { Text = "Søg efter opdatering", Width = 160, Height = 30, Dock = DockStyle.Right };
+    private const string RepoUrl = "https://github.com/kreaton/StromForbrug";
+    private readonly UpdateManager _updates = new(new GithubSource(RepoUrl, accessToken: null, prerelease: false));
     private string? _supplierName;
 
     // ---- period ----
@@ -67,7 +72,8 @@ public sealed class MainForm : Form
 
     public MainForm()
     {
-        Text = "StromForbrug – dit elforbrug i kWh og kroner";
+        var version = typeof(MainForm).Assembly.GetName().Version;
+        Text = $"StromForbrug {version?.ToString(3)} – dit elforbrug i kWh og kroner";
         Width = 1280;
         Height = 900;
         MinimumSize = new Size(1040, 720);
@@ -94,6 +100,7 @@ public sealed class MainForm : Form
         RestoreSimpleSettings();
 
         _btnSettings.Click += async (_, _) => await OpenSettingsAsync(firstRun: false);
+        _btnUpdate.Click += async (_, _) => await CheckForUpdateAsync();
         _rbHour.CheckedChanged += (_, _) => OnResolutionChanged();
         _btnWeek.Click += async (_, _) => { SetRange(7); await LoadAsync(); };
         _btnMonth.Click += async (_, _) => { SetRange(30); await LoadAsync(); };
@@ -141,8 +148,49 @@ public sealed class MainForm : Form
     {
         var bar = new Panel { Dock = DockStyle.Top, Height = 42, Padding = new Padding(14, 6, 14, 4) };
         bar.Controls.Add(_lblSetup);
+        bar.Controls.Add(_btnUpdate);
+        bar.Controls.Add(new Panel { Width = 8, Dock = DockStyle.Right });
         bar.Controls.Add(_btnSettings);
         return bar;
+    }
+
+    /// <summary>Looks for a newer GitHub release and installs it (installed copies only).</summary>
+    private async Task CheckForUpdateAsync()
+    {
+        if (!_updates.IsInstalled)
+        {
+            MessageBox.Show(this, "Opdateringer virker kun i den installerede udgave (Setup.exe fra GitHub).",
+                "Opdatering", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        _btnUpdate.Enabled = false;
+        try
+        {
+            var update = await _updates.CheckForUpdatesAsync();
+            if (update is null)
+            {
+                MessageBox.Show(this, "Du har den nyeste udgave.", "Opdatering", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            var answer = MessageBox.Show(this,
+                $"Version {update.TargetFullRelease.Version} er klar. Hent og installér den nu? StromForbrug genstarter bagefter.",
+                "Opdatering", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (answer != DialogResult.Yes)
+                return;
+
+            await _updates.DownloadUpdatesAsync(update);
+            _updates.ApplyUpdatesAndRestart(update);
+        }
+        catch (Exception ex)
+        {
+            ShowError("Opdateringen mislykkedes.", ex);
+        }
+        finally
+        {
+            _btnUpdate.Enabled = true;
+        }
     }
 
     private GroupBox BuildPeriodBox()

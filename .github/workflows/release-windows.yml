@@ -1,0 +1,43 @@
+name: Release Windows app
+
+on:
+  push:
+    branches: [ "main" ]
+    # The Windows app and what it is built from; web-only changes don't make a new release.
+    paths:
+      - "StromForbrug.Windows/**"
+      - "StromForbrug.Core/**"
+      - "Eloverblik/**"
+      - "Stromligning/**"
+      - "tools/BuildRelease.ps1"
+      - ".github/workflows/release-windows.yml"
+  workflow_dispatch: # Also allows a manual run from the Actions tab
+
+# The version is derived from the latest release, so two runs must never overlap.
+concurrency:
+  group: release-windows
+  cancel-in-progress: false
+
+permissions:
+  contents: write # create the GitHub release and upload its assets
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # vpk is a .NET tool, and the script also builds the app.
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      # Keep this version in step with the Velopack package in StromForbrug.Windows.csproj.
+      - name: Install vpk
+        run: dotnet tool install -g vpk --version 1.2.161
+
+      - name: Build, pack and publish
+        shell: pwsh
+        run: ./tools/BuildRelease.ps1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

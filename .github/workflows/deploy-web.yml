@@ -44,7 +44,9 @@ jobs:
           name: publish-output
           path: release
 
-      # Uploads the static site (wwwroot/). Only changed files are sent after the first run.
+      # Uploads the site (wwwroot/), including the PHP relay api/eloverblik.php that the app needs
+      # for Eloverblik, so this host must run PHP 8 with curl. Only changed files are sent after
+      # the first run.
       # Repository secrets (Settings > Secrets and variables > Actions):
       #   FTP_HOST      e.g. ftp.example.com
       #   FTP_USERNAME
@@ -60,6 +62,7 @@ jobs:
           local-dir: ./release/wwwroot/
 
   # Publishes to https://kreaton.github.io/StromForbrug/ (Settings > Pages > Source: GitHub Actions).
+  # Pages cannot run PHP, so there the app shows prices but cannot reach Eloverblik.
   deploy-pages:
     needs: build
     runs-on: ubuntu-latest

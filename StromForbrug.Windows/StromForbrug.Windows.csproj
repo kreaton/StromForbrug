@@ -1,5 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!--
+    Version: Major.Minor is set here by hand; the patch is passed in by BuildRelease.ps1 as
+    -p:BuildNumber=<n> (one higher than the last GitHub release) and stays 0 for local builds.
+    Velopack packs Major.Minor.BuildNumber.
+  -->
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
@@ -9,7 +14,18 @@
     <AssemblyName>StromForbrug</AssemblyName>
     <RootNamespace>StromForbrug.Windows</RootNamespace>
     <ApplicationIcon>app.ico</ApplicationIcon>
+
+    <MajorMinor>1.0</MajorMinor>
+    <BuildNumber Condition="'$(BuildNumber)' == ''">0</BuildNumber>
+    <Version>$(MajorMinor).$(BuildNumber)</Version>
+    <Authors>Per Hejndorf</Authors>
+    <Copyright>© 2026 Per Hejndorf, Kreaton</Copyright>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Keep in step with the vpk version in .github/workflows/release-windows.yml. -->
+    <PackageReference Include="Velopack" Version="1.2.161" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\StromForbrug.Core\StromForbrug.Core.csproj" />
