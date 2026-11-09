@@ -20,6 +20,13 @@ public static class RefreshTokenFormat
         if (token.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
             token = token[7..];
         token = new string(token.Where(IsTokenChar).ToArray());
+
+        // A JWT starts with "eyJ" (base64 of '{"'). Mail programs and the iPad's keyboard like to
+        // capitalise the first letter of a "sentence", turning it into "EyJ", which keeps the length
+        // but makes the token unreadable to Eloverblik (500). Nothing valid starts with "EyJ".
+        if (token.StartsWith("EyJ", StringComparison.Ordinal))
+            token = "e" + token[1..];
+
         return token.Length == 0 ? null : token;
     }
 
