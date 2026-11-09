@@ -218,19 +218,34 @@ public sealed class MainForm : Form
 
     private Control BuildTiles()
     {
-        var table = new TableLayoutPanel { Dock = DockStyle.Top, Height = 92, ColumnCount = 4, Padding = new Padding(8, 6, 8, 2) };
+        var table = new TableLayoutPanel { Dock = DockStyle.Top, ColumnCount = 4, RowCount = 1, Padding = new Padding(8, 6, 8, 2) };
         for (var i = 0; i < 4; i++)
             table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
+        table.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
-        table.Controls.Add(Tile(NewTileCaption("Forbrug i alt"), _lblKwh, _lblKwhSub), 0, 0);
-        table.Controls.Add(Tile(NewTileCaption("Pris i alt"), _lblCost, _lblCostSub), 1, 0);
-        table.Controls.Add(Tile(NewTileCaption("Gennemsnitspris"), _lblAvg, _lblAvgSub), 2, 0);
-        table.Controls.Add(Tile(_lblPeakCaption, _lblPeak, _lblPeakSub), 3, 0);
+        Panel[] tiles =
+        [
+            Tile(NewTileCaption("Forbrug i alt"), _lblKwh, _lblKwhSub),
+            Tile(NewTileCaption("Pris i alt"), _lblCost, _lblCostSub),
+            Tile(NewTileCaption("Gennemsnitspris"), _lblAvg, _lblAvgSub),
+            Tile(_lblPeakCaption, _lblPeak, _lblPeakSub)
+        ];
+        for (var i = 0; i < tiles.Length; i++)
+            table.Controls.Add(tiles[i], i, 0);
+
+        // Size the lines from their fonts rather than fixed pixels: with Windows display scaling
+        // the text grows, and fixed heights let the tiles' lower part slide under the tabs.
+        var tile = tiles[0];
+        var inner = tile.Controls.Cast<Control>().Sum(c => c.Height);
+        var tileHeight = inner + tile.Padding.Vertical + 2 /* border */;
+        table.Height = tileHeight + tile.Margin.Vertical + table.Padding.Vertical;
         return table;
 
         static Panel Tile(Label caption, Label value, Label sub)
         {
             var panel = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, BorderStyle = BorderStyle.FixedSingle, Padding = new Padding(10, 4, 6, 4), Margin = new Padding(4) };
+            foreach (var label in new[] { caption, value, sub })
+                label.Height = TextRenderer.MeasureText("Åg", label.Font).Height + 2;
             // Dock=Top stacks in reverse order of addition.
             panel.Controls.Add(sub);
             panel.Controls.Add(value);
