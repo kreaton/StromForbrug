@@ -1,11 +1,8 @@
-using System.Text;
-using System.Text.Json;
-
 namespace Eloverblik;
 
 /// <summary>
-/// Cleans and checks a pasted refresh token before it is sent. Eloverblik's tokens are JWTs of
-/// roughly 3,500 characters; a token that lost a piece when it was copied (easy on a phone or
+/// Cleans and checks a pasted refresh token before it is sent. Eloverblik's tokens are
+/// several thousand characters long; a token that lost a piece when it was copied (easy on a phone or
 /// tablet) makes Eloverblik answer 500 "An error occurred processing your request" rather than 401.
 /// </summary>
 public static class RefreshTokenFormat
@@ -29,33 +26,13 @@ public static class RefreshTokenFormat
     private static bool IsTokenChar(char c) =>
         c is (>= 'A' and <= 'Z') or (>= 'a' and <= 'z') or (>= '0' and <= '9') or '-' or '_' or '.' or '+' or '/' or '=';
 
-    /// <summary>
-    /// False when the token is clearly cut short: a JWT has three dot-separated parts, and its
-    /// first part is a small base64url-encoded JSON header. Most of the token is the middle part,
-    /// so a token cut anywhere there loses the last dot and fails this. Deliberately lenient:
-    /// anything else is left to Eloverblik to judge.
-    /// </summary>
-    public static bool LooksComplete(string? token)
-    {
-        if (string.IsNullOrEmpty(token))
-            return false;
-        var parts = token.Split('.');
-        return parts.Length == 3 && parts.All(p => p.Length > 0) && IsJsonObject(parts[0]);
-    }
+    /// <summary>Real tokens are several thousand characters (3,512 and 3,804 seen).</summary>
+    public const int MinimumLength = 1000;
 
-    private static bool IsJsonObject(string base64Url)
-    {
-        try
-        {
-            var s = base64Url.Replace('-', '+').Replace('_', '/');
-            s = s.PadRight(s.Length + (4 - s.Length % 4) % 4, '=');
-            var json = Encoding.UTF8.GetString(Convert.FromBase64String(s));
-            using var doc = JsonDocument.Parse(json);
-            return doc.RootElement.ValueKind == JsonValueKind.Object;
-        }
-        catch (Exception ex) when (ex is FormatException or JsonException or ArgumentException)
-        {
-            return false;
-        }
-    }
+    /// <summary>
+    /// False only when the token is clearly too short to be a whole one. Its inner structure is
+    /// not checked: real tokens did not match a plain JWT check, so anything else is left to
+    /// Eloverblik, whose 500 for an unreadable token becomes <see cref="EloverblikApiException.IsTokenUnreadable"/>.
+    /// </summary>
+    public static bool LooksComplete(string? token) => token is { Length: >= MinimumLength };
 }
