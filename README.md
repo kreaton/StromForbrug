@@ -141,7 +141,10 @@ PHP sees it, so through a relay the app repeats the token in `X-Eloverblik-Autho
   `EloverblikApiException`. 429 and 503 mean "try again later" (`IsBusy`), 401 on the token call
   means the refresh token is wrong or expired (`IsUnauthorized`).
 
-## License
+## License & Authorship
 
-[MIT](LICENSE) © 2026 Per Hejndorf. Consumption data from [Eloverblik](https://eloverblik.dk),
-price data from [stromligning.dk](https://stromligning.dk).
+This project is distributed under the terms of the [MIT License](LICENSE).
+
+Consumption data from [Eloverblik](https://eloverblik.dk), price data from [stromligning.dk](https://stromligning.dk).
+
+**AI authorship note:** Most of the source code in this repository was generated with AI coding agents (Claude Code), under my direction and review. Purely AI-generated material may not be eligible for copyright protection in some jurisdictions. To the extent any part of this project is protected by copyright, it is licensed under the MIT License, and the license's warranty and liability disclaimers apply to the project as a whole.
