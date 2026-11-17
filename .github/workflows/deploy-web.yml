@@ -29,7 +29,7 @@ jobs:
         run: dotnet publish StromForbrug.Web/StromForbrug.Web.csproj -c Release -o release -p:BuildNumber=${{ github.run_number }}
 
       - name: Upload publish artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: publish-output
           path: release
