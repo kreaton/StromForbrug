@@ -12,6 +12,9 @@ on:
       - ".github/workflows/deploy-web.yml"
   workflow_dispatch: # Also allows a manual run from the Actions tab
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
