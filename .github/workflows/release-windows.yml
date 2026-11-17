@@ -25,7 +25,7 @@ jobs:
   release:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # vpk is a .NET tool, and the script also builds the app.
       - uses: actions/setup-dotnet@v5
