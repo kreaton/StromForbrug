@@ -10,7 +10,7 @@ _Last reviewed: 2026-11-17. Versions are the ones resolved in this repository at
 |---|---|---|---|---|
 | .NET runtime and Blazor WebAssembly (shipped in `_framework/`) | 10.0 | MIT | [dotnet/runtime](https://github.com/dotnet/runtime), [dotnet/aspnetcore](https://github.com/dotnet/aspnetcore) | No |
 | Microsoft.AspNetCore.Components.WebAssembly | 10.0.14 | MIT | [NuGet](https://www.nuget.org/packages/Microsoft.AspNetCore.Components.WebAssembly/10.0.14) | No |
-| Velopack | 1.2.161 | MIT | [NuGet](https://www.nuget.org/packages/Velopack/1.2.161) · [source](https://github.com/velopack/velopack) | No |
+| Velopack | 1.3.39-g8d2844f | MIT | [NuGet](https://www.nuget.org/packages/Velopack/1.3.39-g8d2844f) · [source](https://github.com/velopack/velopack) | No |
 
 <details>
 <summary>Indirect (transitive) dependencies — 25 packages</summary>

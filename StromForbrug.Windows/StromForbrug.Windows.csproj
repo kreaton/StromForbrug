@@ -24,7 +24,7 @@
 
   <ItemGroup>
     <!-- Keep in step with the vpk version in .github/workflows/release-windows.yml. -->
-    <PackageReference Include="Velopack" Version="1.2.161" />
+    <PackageReference Include="Velopack" Version="1.3.39-g8d2844f" />
   </ItemGroup>
 
   <ItemGroup>
