@@ -1,0 +1,26 @@
+# Dependabot version updates (free for public and private repositories).
+# Security updates and alerts are switched on in Settings > Advanced Security.
+version: 2
+updates:
+  - package-ecosystem: "nuget"
+    directories:
+      - "/Eloverblik"
+      - "/StromForbrug.Core"
+      - "/StromForbrug.Web"
+      - "/StromForbrug.Windows"
+      - "/Stromligning"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      nuget-minor-and-patch:
+        update-types: ["minor", "patch"]
+  - package-ecosystem: "github-actions"
+    directories:
+      - "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 5
+    groups:
+      actions:
+        update-types: ["minor", "patch"]

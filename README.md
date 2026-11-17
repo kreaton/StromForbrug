@@ -148,3 +148,13 @@ This project is distributed under the terms of the [MIT License](LICENSE).
 Consumption data from [Eloverblik](https://eloverblik.dk), price data from [stromligning.dk](https://stromligning.dk).
 
 **AI authorship note:** Most of the source code in this repository was generated with AI coding agents (Claude Code), under my direction and review. Purely AI-generated material may not be eligible for copyright protection in some jurisdictions. To the extent any part of this project is protected by copyright, it is licensed under the MIT License, and the license's warranty and liability disclaimers apply to the project as a whole.
+
+<!-- notices:start -->
+### Independent development
+
+StromForbrug is an independent, personal project developed by Per Hejndorf. It is not affiliated with, endorsed by or sponsored by Microsoft or any other rights holder (including Energinet or Strømligning). Product names and logos are trademarks of their respective owners and are used only to identify the services and tools the project works with.
+
+### Third-party notices and asset provenance
+
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) lists every third-party library, font and online service the project uses, with version, licence, source and whether it was modified. It also records where the icons, images, audio and video came from and how they are licensed. A few assets are not covered by the MIT License; [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) marks them and states their terms.
+<!-- notices:end -->
