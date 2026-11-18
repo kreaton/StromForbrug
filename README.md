@@ -20,7 +20,10 @@
   <img src="https://img.shields.io/badge/.NET-10-512bd4" alt=".NET 10">
   <img src="https://img.shields.io/badge/Blazor-WebAssembly-5c2d91" alt="Blazor WebAssembly">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
+  <a href="https://github.com/kreaton/StromForbrug/stargazers"><img src="https://img.shields.io/github/stars/kreaton/StromForbrug?style=flat&logo=github&color=yellow" alt="GitHub stars"></a>
 </p>
+
+<p align="center">⭐ If StromForbrug earns a place on your machine, <a href="https://github.com/kreaton/StromForbrug">star it on GitHub</a> — it's free, made by one developer, and stars are how other people find it.</p>
 
 <p align="center">
   <img src="docs/forbrug-dag.jpg" width="640" alt="StromForbrug: 30 days of consumption, one bar per day, with totals for kWh, cost and average price">
