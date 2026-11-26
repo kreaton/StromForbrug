@@ -12,8 +12,8 @@ public sealed record ChartBar(DateTime Start, double[] Values, bool Muted = fals
 
 /// <summary>
 /// A stacked bar chart over time that fills its client area: hourly bars with a line at each
-/// midnight, or daily bars with a line before each Monday. Gridlines fall on round numbers and
-/// hovering a bar shows the text from <see cref="TooltipText"/>.
+/// midnight, or daily bars with a line before each Monday. Gridlines fall on round numbers and are
+/// drawn over the bars (thinner at x.5), and hovering a bar shows the text from <see cref="TooltipText"/>.
 /// </summary>
 public sealed class BarChartControl : Control
 {
@@ -71,7 +71,11 @@ public sealed class BarChartControl : Control
 
         using var inkBrush = new SolidBrush(Color.FromArgb(82, 81, 78));
         using var mutedBrush = new SolidBrush(Color.FromArgb(137, 135, 129));
-        using var gridPen = new Pen(Color.FromArgb(225, 224, 217));
+        // Axis numbers in black; gridlines dark and drawn over the bars so they read across them.
+        using var numberBrush = new SolidBrush(Color.FromArgb(11, 11, 11));
+        using var gridPen = new Pen(Color.FromArgb(179, 11, 11, 11), 3);
+        using var halfPen = new Pen(Color.FromArgb(179, 11, 11, 11), 2);
+        using var zeroPen = new Pen(Color.FromArgb(11, 11, 11), 3);
         using var axisPen = new Pen(Color.FromArgb(195, 194, 183));
 
         DrawLegend(g, inkBrush, mutedBrush);
@@ -97,11 +101,9 @@ public sealed class BarChartControl : Control
 
         for (var v = yMin; v <= yMax + step / 1000; v += step)
         {
-            var y = Y(v);
-            g.DrawLine(Math.Abs(v) < 1e-9 ? axisPen : gridPen, _plot.Left, y, _plot.Right, y);
             var text = v.ToString(tickFormat, Da);
             var size = g.MeasureString(text, Font);
-            g.DrawString(text, Font, mutedBrush, _plot.Left - 6 - size.Width, y - size.Height / 2);
+            g.DrawString(text, Font, numberBrush, _plot.Left - 6 - size.Width, Y(v) - size.Height / 2);
         }
 
         var slot = (float)_plot.Width / _bars.Count;
@@ -149,6 +151,14 @@ public sealed class BarChartControl : Control
             }
         }
 
+        // Gridlines on top of the bars: 3px, 2px at the in-between .5 values, solid at zero.
+        for (var v = yMin; v <= yMax + step / 1000; v += step)
+        {
+            var y = MathF.Round(Y(v));
+            var pen = Math.Abs(v) < 1e-9 ? zeroPen : Math.Abs(Math.Abs(v % 1) - 0.5) < 1e-6 ? halfPen : gridPen;
+            g.DrawLine(pen, _plot.Left, y, _plot.Right, y);
+        }
+
         // ▲ on the highest bar.
         if (_bars.Count > 1)
         {
@@ -160,7 +170,7 @@ public sealed class BarChartControl : Control
         }
 
         g.DrawLine(axisPen, _plot.Left, _plot.Bottom, _plot.Right, _plot.Bottom);
-        DrawXAxis(g, slot, inkBrush, mutedBrush);
+        DrawXAxis(g, slot, inkBrush, numberBrush);
     }
 
     private void DrawLegend(Graphics g, Brush ink, Brush muted)
@@ -183,7 +193,7 @@ public sealed class BarChartControl : Control
         g.DrawString(Unit, Font, muted, Width - 14 - unitSize.Width, 7);
     }
 
-    private void DrawXAxis(Graphics g, float slot, Brush ink, Brush muted)
+    private void DrawXAxis(Graphics g, float slot, Brush ink, Brush numbers)
     {
         using var bold = new Font(Font, FontStyle.Bold);
         var top = _plot.Bottom + 3;
@@ -196,7 +206,7 @@ public sealed class BarChartControl : Control
             {
                 var d = _bars[i].Start;
                 if (every || d.DayOfWeek == DayOfWeek.Monday)
-                    Centered(d.Day.ToString(Da), i, top, muted);
+                    Centered(d.Day.ToString(Da), i, top, numbers);
                 if (i == 0 || d.Day == 1)
                     g.DrawString(d.ToString("MMMM", Da), bold, ink, _plot.Left + i * slot, top + 17);
             }
@@ -210,7 +220,7 @@ public sealed class BarChartControl : Control
         {
             var d = _bars[i].Start;
             if (d.Hour % stepHours == 0 && stepHours < 24)
-                Centered(d.ToString("HH", Da), i, top, muted);
+                Centered(d.ToString("HH", Da), i, top, numbers);
             if (i == 0 || d.Date != _bars[i - 1].Start.Date)
             {
                 var label = d.ToString(slot * 24 >= 80 ? "ddd d. MMM" : "d/M", Da);
