@@ -2,7 +2,8 @@
 
 @* Stacked bars over time. Hourly bars have a fixed width and the plot scrolls sideways when they
    do not fit, with the value axis staying put on the left; daily bars (at most a month) share
-   the width between them. Gridlines fall on round numbers picked from the data. *@
+   the width between them. Gridlines fall on round numbers picked from the data and are drawn
+   over the bars; the ones at x.5 are thinner. *@
 
 <div class="legend" aria-label="Forklaring">
     @if (Parts.Count > 1)
@@ -31,7 +32,7 @@
         <div class="plot @(Daily ? "daily" : null)" style="width:@PlotWidth" @onmouseleave="ClearHover">
             @foreach (var v in _ticks)
             {
-                <div class="grid @(v == 0 ? "zero" : null)" style="top:@Px(Y(v))"></div>
+                <div class="grid @(v == 0 ? "zero" : null) @(Math.Abs(Math.Abs(v % 1) - 0.5) < 1e-6 ? "half" : null)" style="top:@Px(Y(v))"></div>
             }
 
             @foreach (var i in _separators)
