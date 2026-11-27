@@ -7,7 +7,7 @@ save the result as CSV or JSON.
 
 It has no UI or Windows dependencies (plain `net10.0`), so it works from a console tool, a
 web API, a background service, a desktop app or the browser (Blazor WebAssembly). The
-[StromPriser](../StromPriser/README.md) WinForms app and the [ElForecast](../ElForecast/README.md) Blazor app
+[StromPriser](../StromPriser/README.md) WinForms app and the [El Forecast](../ElForecast/README.md) Blazor app
 in this repository both use it.
 
 ## Quick start
