@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Runs StromForbrug locally: the Eloverblik relay (PHP) and the web app (Blazor dev server).
+    Runs El Forbrug locally: the Eloverblik relay (PHP) and the web app (Blazor dev server).
 
 .DESCRIPTION
     Browsers may not read Eloverblik's answers directly, so the web app goes through
@@ -24,7 +24,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
-$web = Join-Path $root 'StromForbrug.Web'
+$web = Join-Path $root 'ElForbrug.Web'
 $wwwroot = Join-Path $web 'wwwroot'
 
 $php = (Get-Command php -ErrorAction SilentlyContinue).Source

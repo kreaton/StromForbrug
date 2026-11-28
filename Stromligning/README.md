@@ -7,8 +7,8 @@ save the result as CSV or JSON.
 
 It has no UI or Windows dependencies (plain `net10.0`), so it works from a console tool, a
 web API, a background service, a desktop app or the browser (Blazor WebAssembly). In this
-repository `StromForbrug.Core` and the StromForbrug.Web Blazor app use it; it is a copy of the
-library in [StromPriser](https://github.com/kreaton/StromPriser).
+repository `ElForbrug.Core` and the ElForbrug.Web Blazor app use it; it is a copy of the
+library in [El Forecast](https://github.com/kreaton/ElForecast).
 
 ## Quick start
 

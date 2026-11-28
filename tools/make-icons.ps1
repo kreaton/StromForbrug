@@ -1,9 +1,9 @@
-# Renders the StromForbrug icon in every size into StromForbrug.Web/wwwroot/icons:
+# Renders the El Forbrug icon in every size into ElForbrug.Web/wwwroot/icons:
 # consumption bars (kWh at the bottom, kroner on top) under a yellow lightning bolt on a green tile.
 #   powershell -File tools\make-icons.ps1
 Add-Type -AssemblyName System.Drawing
 
-$out = Join-Path $PSScriptRoot "..\StromForbrug.Web\wwwroot\icons"
+$out = Join-Path $PSScriptRoot "..\ElForbrug.Web\wwwroot\icons"
 New-Item -ItemType Directory -Force $out | Out-Null
 
 function New-RoundedRect([float]$x, [float]$y, [float]$w, [float]$h, [float]$r) {

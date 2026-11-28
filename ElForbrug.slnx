@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="Eloverblik/Eloverblik.csproj" />
+  <Project Path="Stromligning/Stromligning.csproj" />
+  <Project Path="ElForbrug.Core/ElForbrug.Core.csproj" />
+  <Project Path="ElForbrug.Web/ElForbrug.Web.csproj" />
+</Solution>

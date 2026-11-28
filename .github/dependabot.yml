@@ -5,8 +5,8 @@ updates:
   - package-ecosystem: "nuget"
     directories:
       - "/Eloverblik"
-      - "/StromForbrug.Core"
-      - "/StromForbrug.Web"
+      - "/ElForbrug.Core"
+      - "/ElForbrug.Web"
       - "/Stromligning"
     schedule:
       interval: "weekly"
