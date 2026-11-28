@@ -361,6 +361,3 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
-# Windows release build (tools/BuildRelease.ps1)
-publish-windows/
-/Releases/

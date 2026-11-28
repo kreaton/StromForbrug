@@ -122,7 +122,4 @@ function Save-Ico([int[]]$sizes, [string]$path) {
 # favicon.ico with 16, 32 and 48 px images, for browsers.
 Save-Ico @(16, 32, 48) (Join-Path $out "..\favicon.ico")
 
-# The Windows app's icon: every size Explorer, the taskbar and Alt+Tab ask for.
-Save-Ico @(16, 20, 24, 32, 40, 48, 64, 128, 256) (Join-Path $PSScriptRoot "..\StromForbrug.Windows\app.ico")
-
-Write-Host "Icons written to $out and StromForbrug.Windows\app.ico"
+Write-Host "Icons written to $out"
