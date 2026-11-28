@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://hejndorf.dk/stromforbrug/"><img src="https://img.shields.io/badge/open%20the%20app-hejndorf.dk-2ea44f?style=for-the-badge" alt="Open the app"></a>
+  <a href="https://kreaton.github.io/StromForbrug/"><img src="https://img.shields.io/badge/open%20the%20app-GitHub%20Pages-2ea44f?style=for-the-badge" alt="Open the app"></a>
 </p>
 
 <p align="center">
@@ -41,10 +41,10 @@ The consumption comes from [Eloverblik](https://eloverblik.dk), the prices from
 
 ## Using it
 
-Open **<https://hejndorf.dk/stromforbrug/>** in a browser – nothing to install. It can be added
+Open **<https://kreaton.github.io/StromForbrug/>** in a browser – nothing to install. It can be added
 to the home screen of a phone. It shows bar charts of kWh and kroner, and tables.
 
-Your token is kept in your browser. It is sent to Eloverblik through the site's small relay,
+Your token is kept in your browser. It is sent to Eloverblik through a small relay on hejndorf.dk,
 which stores nothing ([why](#why-the-web-app-needs-a-php-relay)).
 
 ## Getting started
@@ -101,7 +101,7 @@ tools/run-dev.ps1                           # PHP relay on :5290 + web app on ht
 
 | Workflow | Runs on pushes to `main` that touch | Publishes |
 |---|---|---|
-| [`deploy-web.yml`](.github/workflows/deploy-web.yml) | the web app and the libraries | The site with the relay by FTP to [hejndorf.dk/stromforbrug](https://hejndorf.dk/stromforbrug/), and to [GitHub Pages](https://kreaton.github.io/StromForbrug/) (prices only – Pages cannot run PHP) |
+| [`deploy-web.yml`](.github/workflows/deploy-web.yml) | the web app and the libraries | The app to [GitHub Pages](https://kreaton.github.io/StromForbrug/), and the PHP relay by FTP to hejndorf.dk/stromforbrug/api/ (with a page there that sends old links on to Pages) |
 
 The FTP job needs the repository secrets `FTP_HOST`, `FTP_USERNAME`, `FTP_PASSWORD` and
 `FTP_FOLDER`. The icons are drawn by `tools/make-icons.ps1`.
@@ -113,17 +113,19 @@ A browser only lets a page read another site's answer if the answer carries an
 don't, so the browser throws away the access token and the app sees only `TypeError: Failed to
 fetch`.
 
-So the web app sends its Eloverblik calls to `api/eloverblik.php` on its own site, which passes
+So the web app sends its Eloverblik calls to `api/eloverblik.php`, which passes
 them on to `api.eloverblik.dk` and returns the answer. It relays only the three endpoints the app
 uses (token, metering points, time series), stores and logs nothing, and needs PHP 8 with the curl
 extension. Many Apache/PHP hosts (hejndorf.dk among them) drop the `Authorization` header before
 PHP sees it, so through a relay the app repeats the token in `X-Eloverblik-Authorization`.
 
-- **Hosting:** the site must run PHP. On a static host such as GitHub Pages the app loads and shows
-  prices, but says it cannot reach Eloverblik.
+- **Hosting:** the relay needs a host that runs PHP, which GitHub Pages cannot. The app is served
+  from Pages and calls the relay on hejndorf.dk (`EloverblikRelay` in `wwwroot/appsettings.json`),
+  which lets pages from `https://kreaton.github.io` read its answers. Without that setting the app
+  uses `api/eloverblik.php` on its own site.
 - **Development:** the Blazor dev server does not run PHP. `tools/run-dev.ps1` starts PHP's built-in
   server on port 5290 for the relay, and `wwwroot/appsettings.Development.json` (not published)
-  points the app there. The relay lets `localhost` pages read its answers for this purpose.
+  points the app there. The relay lets `localhost` pages read its answers too.
 
 ### Notes on the Eloverblik API
 

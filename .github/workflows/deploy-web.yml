@@ -1,4 +1,4 @@
-name: Build and Deploy StromForbrug to FTP and GitHub Pages
+name: Build and Deploy StromForbrug to GitHub Pages (relay by FTP)
 
 on:
   push:
@@ -47,25 +47,45 @@ jobs:
           name: publish-output
           path: release
 
-      # Uploads the site (wwwroot/), including the PHP relay api/eloverblik.php that the app needs
-      # for Eloverblik, so this host must run PHP 8 with curl. Only changed files are sent after
-      # the first run.
+      # The app itself is served from GitHub Pages (deploy-pages below). Pages cannot run PHP, so
+      # only the relay api/eloverblik.php goes to this host, which must run PHP 8 with curl, plus a
+      # page that sends old links on to Pages. Only changed files are sent, and files from earlier
+      # runs that are no longer in relay-site/ are removed from the host.
+      - name: Assemble relay site
+        run: |
+          mkdir -p relay-site
+          cp -r release/wwwroot/api relay-site/api
+          cat > relay-site/index.html <<'EOF'
+          <!DOCTYPE html>
+          <html lang="da">
+          <head>
+            <meta charset="utf-8">
+            <title>StromForbrug er flyttet</title>
+            <meta http-equiv="refresh" content="0; url=https://kreaton.github.io/StromForbrug/">
+            <script>location.replace("https://kreaton.github.io/StromForbrug/" + location.search + location.hash);</script>
+          </head>
+          <body>
+            <p>StromForbrug er flyttet til <a href="https://kreaton.github.io/StromForbrug/">kreaton.github.io/StromForbrug</a>.</p>
+          </body>
+          </html>
+          EOF
+
       # Repository secrets (Settings > Secrets and variables > Actions):
       #   FTP_HOST      e.g. ftp.example.com
       #   FTP_USERNAME
       #   FTP_PASSWORD
       #   FTP_FOLDER    e.g. webroots/www/stromforbrug  (no trailing slash)
-      - name: Deploy to FTP
+      - name: Deploy relay to FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.4.0
         with:
           server: ${{ secrets.FTP_HOST }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           server-dir: ${{ secrets.FTP_FOLDER }}/
-          local-dir: ./release/wwwroot/
+          local-dir: ./relay-site/
 
-  # Publishes to https://kreaton.github.io/StromForbrug/ (Settings > Pages > Source: GitHub Actions).
-  # Pages cannot run PHP, so there the app shows prices but cannot reach Eloverblik.
+  # Publishes the app to https://kreaton.github.io/StromForbrug/ (Settings > Pages > Source: GitHub
+  # Actions). It reaches Eloverblik through the relay on hejndorf.dk (wwwroot/appsettings.json).
   deploy-pages:
     needs: build
     runs-on: ubuntu-latest

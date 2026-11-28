@@ -29,11 +29,13 @@ function fail(int $status, string $message): void
     exit;
 }
 
-// Local development only: the app's dev server (localhost:5286) and this script (php -S on
-// another port) are different origins, so allow localhost pages to read the answers. Production
-// serves the app and this script from the same site and needs nothing here.
+// The app is served from GitHub Pages (kreaton.github.io), which cannot run PHP, so this script
+// lives on another site and must let the Pages origin read its answers. During development the
+// app's dev server (localhost:5286) and this script (php -S on another port) are different
+// origins too, so localhost pages are allowed as well.
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-if (preg_match('#^https?://(localhost|127\.0\.0\.1)(:\d+)?$#', $origin)) {
+if ($origin === 'https://kreaton.github.io'
+    || preg_match('#^https?://(localhost|127\.0\.0\.1)(:\d+)?$#', $origin)) {
     header('Access-Control-Allow-Origin: ' . $origin);
     header('Vary: Origin');
     if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {

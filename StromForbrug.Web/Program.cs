@@ -17,9 +17,10 @@ CultureInfo.DefaultThreadCurrentUICulture = danish;
 
 // Strømligning allows browsers to read its answers ("Access-Control-Allow-Origin: *"), so it is
 // called directly. Eloverblik's successful answers lack that header, so the browser would throw
-// them away: Eloverblik goes through the relay wwwroot/api/eloverblik.php on the app's own site.
-// "EloverblikRelay" (wwwroot/appsettings.Development.json) points elsewhere during development,
-// where the dev server does not run PHP; see tools/run-dev.ps1.
+// them away: Eloverblik goes through the relay wwwroot/api/eloverblik.php. The app is served from
+// GitHub Pages, which cannot run PHP, so "EloverblikRelay" (wwwroot/appsettings.json) points at the
+// copy on hejndorf.dk; wwwroot/appsettings.Development.json points at a local one during
+// development (see tools/run-dev.ps1). Without the setting, the relay on the app's own site is used.
 builder.Services.AddSingleton(_ => new StromligningClient(
     new HttpClient { Timeout = TimeSpan.FromSeconds(30) }, BuildInfo.UserAgent));
 var relay = new Uri(new Uri(builder.HostEnvironment.BaseAddress),
