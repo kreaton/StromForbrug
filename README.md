@@ -11,12 +11,10 @@
 
 <p align="center">
   <a href="https://hejndorf.dk/stromforbrug/"><img src="https://img.shields.io/badge/open%20the%20app-hejndorf.dk-2ea44f?style=for-the-badge" alt="Open the app"></a>
-  <a href="https://github.com/kreaton/StromForbrug/releases/latest"><img src="https://img.shields.io/github/v/release/kreaton/StromForbrug?style=for-the-badge&label=Windows%20app&color=1a8a57" alt="Download the Windows app"></a>
 </p>
 
 <p align="center">
   <a href="https://github.com/kreaton/StromForbrug/actions/workflows/deploy-web.yml"><img src="https://github.com/kreaton/StromForbrug/actions/workflows/deploy-web.yml/badge.svg" alt="Web deploy"></a>
-  <a href="https://github.com/kreaton/StromForbrug/actions/workflows/release-windows.yml"><img src="https://github.com/kreaton/StromForbrug/actions/workflows/release-windows.yml/badge.svg" alt="Windows release"></a>
   <img src="https://img.shields.io/badge/.NET-10-512bd4" alt=".NET 10">
   <img src="https://img.shields.io/badge/Blazor-WebAssembly-5c2d91" alt="Blazor WebAssembly">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
@@ -36,20 +34,18 @@ tax. Each hour is priced on its own, so you can see what it costs to charge the 
 of at 02.
 
 The consumption comes from [Eloverblik](https://eloverblik.dk), the prices from
-[stromligning.dk](https://stromligning.dk). The apps are in Danish. StromForbrug is the sibling of
+[stromligning.dk](https://stromligning.dk). The app is in Danish. StromForbrug is the sibling of
 [StromPriser](https://github.com/kreaton/StromPriser), which looks at prices *ahead*.
 
 > The screenshots show made-up demo consumption with real prices for Radius (DK2) and Andel Energi.
 
-## Two ways to use it
+## Using it
 
-| | 🌐 **In the browser** | 🪟 **On Windows** |
-|---|---|---|
-| Get it | Open **<https://hejndorf.dk/stromforbrug/>** – nothing to install. It can be added to the home screen of a phone. | Download **[StromForbrug-win-Setup.exe](https://github.com/kreaton/StromForbrug/releases/latest/download/StromForbrug-win-Setup.exe)** from the [latest release](https://github.com/kreaton/StromForbrug/releases/latest). It installs the .NET 10 runtime if needed, and updates itself with **Søg efter opdatering**. |
-| Shows | Bar charts of kWh and kroner, and tables | The same charts, plus one table with every price component |
-| Your token | Kept in your browser. It is sent to Eloverblik through the site's small relay, which stores nothing ([why](#why-the-web-app-needs-a-php-relay)). | Encrypted for your Windows user in `%APPDATA%\StromForbrug\settings.json` |
+Open **<https://hejndorf.dk/stromforbrug/>** in a browser – nothing to install. It can be added
+to the home screen of a phone. It shows bar charts of kWh and kroner, and tables.
 
-A portable zip (no installer) is attached to every release as well.
+Your token is kept in your browser. It is sent to Eloverblik through the site's small relay,
+which stores nothing ([why](#why-the-web-app-needs-a-php-relay)).
 
 ## Getting started
 
@@ -85,7 +81,7 @@ You need a token from Eloverblik – it is free and takes a minute:
 
 - The boxes give the total kWh, the total cost, the average price you paid per kWh (weighted by
   your consumption) and the highest hour or day.
-- **Vis som tabel** shows the numbers, and **Hent CSV** / **Gem som CSV...** saves them in a
+- **Vis som tabel** shows the numbers, and **Hent CSV** saves them in a
   format that opens straight into columns in a Danish Excel.
 
 ## For developers
@@ -96,20 +92,16 @@ You need a token from Eloverblik – it is free and takes a minute:
 | `Stromligning` | Copy of the library from StromPriser, plus an optional `aggregation` ("1h") on `GetPricesAsync`. |
 | `StromForbrug.Core` | `ConsumptionService` fetches both and multiplies them hour by hour (`ConsumptionRow`, `Cost`, daily totals, `Slice`, CSV export). Danish time via `DanishTime`. |
 | `StromForbrug.Web` | The Blazor WebAssembly app. Strømligning is called directly; Eloverblik through the PHP relay `wwwroot/api/eloverblik.php`. |
-| `StromForbrug.Windows` | The Windows Forms app (`StromForbrug.exe`) with a small self-drawn bar chart, installed and updated with [Velopack](https://velopack.io). |
 
 ```powershell
 tools/run-dev.ps1                           # PHP relay on :5290 + web app on http://localhost:5286
-dotnet run --project StromForbrug.Windows   # Windows only
-tools/BuildRelease.ps1 -LocalOnly           # Velopack packages in .\Releases, nothing uploaded
 ```
 
-### Builds and releases
+### Builds
 
 | Workflow | Runs on pushes to `main` that touch | Publishes |
 |---|---|---|
 | [`deploy-web.yml`](.github/workflows/deploy-web.yml) | the web app and the libraries | The site with the relay by FTP to [hejndorf.dk/stromforbrug](https://hejndorf.dk/stromforbrug/), and to [GitHub Pages](https://kreaton.github.io/StromForbrug/) (prices only – Pages cannot run PHP) |
-| [`release-windows.yml`](.github/workflows/release-windows.yml) | the Windows app and the libraries | A [GitHub release](https://github.com/kreaton/StromForbrug/releases) with Setup.exe, a portable zip and Velopack update packages, numbered on from the last release (1.0.*n*) |
 
 The FTP job needs the repository secrets `FTP_HOST`, `FTP_USERNAME`, `FTP_PASSWORD` and
 `FTP_FOLDER`. The icons are drawn by `tools/make-icons.ps1`.
@@ -119,7 +111,7 @@ The FTP job needs the repository secrets `FTP_HOST`, `FTP_USERNAME`, `FTP_PASSWO
 A browser only lets a page read another site's answer if the answer carries an
 `Access-Control-Allow-Origin` header. Eloverblik's *error* answers have it, its *successful* ones
 don't, so the browser throws away the access token and the app sees only `TypeError: Failed to
-fetch`. The Windows app is not affected: the rule exists only in browsers.
+fetch`.
 
 So the web app sends its Eloverblik calls to `api/eloverblik.php` on its own site, which passes
 them on to `api.eloverblik.dk` and returns the answer. It relays only the three endpoints the app

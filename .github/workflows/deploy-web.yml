@@ -3,7 +3,7 @@ name: Build and Deploy StromForbrug to FTP and GitHub Pages
 on:
   push:
     branches: [ "main" ]
-    # Only the web app and what it is built from; changes to the WinForms app don't redeploy.
+    # Only the web app and what it is built from; changes to docs or tools don't redeploy.
     paths:
       - "StromForbrug.Web/**"
       - "StromForbrug.Core/**"

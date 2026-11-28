@@ -1,5 +1,5 @@
 # CodeQL code scanning — free for public repositories.
-# build-mode "none" analyses the source without compiling, so it works for Windows-only projects on Linux runners.
+# build-mode "none" analyses the source without compiling it.
 name: CodeQL
 
 on:
